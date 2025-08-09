@@ -201,7 +201,7 @@ function regenerateFrozenTraces() {
   const currentFamily = viewFamily(currentView);
   
   frozenConfigurations.forEach((config, configIndex) => {
-    const dashStyle = freezeDashStyles[configIndex % freezeDashStyles.length];
+    const dashStyle = (currentFamily === 'wheel') ? freezeDashStyles[configIndex % freezeDashStyles.length] : 'solid';
     const { front, rear, hpKey, weightLb, shiftMs } = config;
     const fd = rear / front;
     const rpmArr = rpmDense;
@@ -214,12 +214,13 @@ function regenerateFrozenTraces() {
       const hpArrRaw = hp_data_sets[hpKey].map(([r, hp]) => hp);
       const rpmArrRaw = hp_data_sets[hpKey].map(([r, hp]) => r);
       const engTq = hp_data_sets[hpKey].map(([rpm, hp]) => (hp * 5252) / rpm);
-      frozenTraces.push({ x:rpmArrRaw, y:engTq, mode:'lines', showlegend:false, hoverinfo:'x+y', hovertemplate:'RPM: %{x} RPM<br>Torque: %{y:.1f} lb-ft<extra></extra>', line:{ color: gear_colors[0], shape:'spline', dash: dashStyle, width:2 }, opacity:0.3 });
-      frozenTraces.push({ x:rpmArrRaw, y:hpArrRaw, mode:'lines', showlegend:false, hoverinfo:'x+y', hovertemplate:'RPM: %{x} RPM<br>HP: %{y:.1f}<extra></extra>', line:{ color: gear_colors[1], shape:'spline', dash: dashStyle, width:2 }, opacity:0.3 });
+      const lineColor = gear_colors[configIndex % gear_colors.length];
+      frozenTraces.push({ x:rpmArrRaw, y:engTq, mode:'lines', showlegend:false, hoverinfo:'x+y', hovertemplate:'RPM: %{x} RPM<br>Torque: %{y:.1f} lb-ft<extra></extra>', line:{ color: lineColor, shape:'spline', width:2 }, opacity:0.7 });
+      frozenTraces.push({ x:rpmArrRaw, y:hpArrRaw, mode:'lines', showlegend:false, hoverinfo:'x+y', hovertemplate:'RPM: %{x} RPM<br>HP: %{y:.1f}<extra></extra>', line:{ color: lineColor, shape:'spline', width:2 }, opacity:0.7 });
       const maxHP = Math.max(...hpArrRaw), maxTQ = Math.max(...engTq);
       frozenTraces.push({ x:[null], y:[null], mode:'lines', name:hpKey, showlegend:true, hoverinfo:'skip', line:{ color:'rgba(0,0,0,0)', width:0 } });
-      frozenTraces.push({ x:[null], y:[null], mode:'lines', name:`Max HP: ${maxHP.toFixed(1)}`, showlegend:true, hoverinfo:'skip', line:{ color:gear_colors[1], shape:'spline', dash:dashStyle, width:2 } });
-      frozenTraces.push({ x:[null], y:[null], mode:'lines', name:`Max TQ: ${maxTQ.toFixed(1)}`, showlegend:true, hoverinfo:'skip', line:{ color:gear_colors[0], shape:'spline', dash:dashStyle, width:2 } });
+      frozenTraces.push({ x:[null], y:[null], mode:'lines', name:`Max HP: ${maxHP.toFixed(1)}`, showlegend:true, hoverinfo:'skip', line:{ color:lineColor, shape:'spline', width:2 } });
+      frozenTraces.push({ x:[null], y:[null], mode:'lines', name:`Max TQ: ${maxTQ.toFixed(1)}`, showlegend:true, hoverinfo:'skip', line:{ color:lineColor, shape:'spline', width:2 } });
     }
     else if (currentFamily === 'accel') {
       const sim = simulateAccel(hpArr, rpmArr, fd, 0.02, weightLb, shiftMs);
@@ -231,13 +232,13 @@ function regenerateFrozenTraces() {
       else { xData = sim.T; yData = sim.V; }
       
       const lineColor = gear_colors[configIndex % gear_colors.length];
-      frozenTraces.push({ x:[null], y:[null], mode:'lines', name:`(F${front}/R${rear} ${hpKey})`, showlegend:true, hoverinfo:'skip', line:{color:lineColor, width:2, dash: dashStyle, shape:'spline'} });
-      frozenTraces.push({ x:xData, y:yData, mode:'lines', showlegend:false, hoverinfo:'x+y', line:{ color: lineColor, width:2, dash: dashStyle, shape:'spline' }, opacity:0.7 });
+      frozenTraces.push({ x:[null], y:[null], mode:'lines', name:`(F${front}/R${rear} ${hpKey})`, showlegend:true, hoverinfo:'skip', line:{color:lineColor, width:2, shape:'spline'} });
+      frozenTraces.push({ x:xData, y:yData, mode:'lines', showlegend:false, hoverinfo:'x+y', line:{ color: lineColor, width:2, shape:'spline' }, opacity:0.7 });
       
       if (showShift) {
         sim.shiftMarkers.forEach(m => {
           const yLabelPos = Math.max(0, (ACCEL_LABEL_BASE - configIndex * ACCEL_LABEL_STEP) * ACCEL_SPEED_YMAX);
-          frozenConnectorTraces.push({ x:[m.t, m.t], y:[yLabelPos, m.v_mph], mode:'lines', line:{ color: gear_colors[m.gear-1], width:1, dash: dashStyle }, showlegend:false, hoverinfo:'skip', yaxis:'y' });
+          frozenConnectorTraces.push({ x:[m.t, m.t], y:[yLabelPos, m.v_mph], mode:'lines', line:{ color: gear_colors[m.gear-1], width:1 }, showlegend:false, hoverinfo:'skip', yaxis:'y' });
           frozenConnectorTraces.push({ x:[m.t], y:[yLabelPos], mode:'text', text:[`${m.t.toFixed(2)} s`], textposition:'top center', textfont:{ color: gear_colors[m.gear-1] }, showlegend:false, hoverinfo:'skip', cliponaxis:false });
         });
       }
@@ -482,21 +483,22 @@ function plotTorque(animate = true) {
   const rpmArr = rpmDense;
   const hpArr  = hpDenseSets[hpKey];
   const fd = rear / front;
-  const activeDash = (freezeCount > 1 && animate) ? freezeDashStyles[(freezeCount - 1) % freezeDashStyles.length] : null;
+  const activeDash = (fam === 'wheel' && freezeCount > 1 && animate) ? freezeDashStyles[(freezeCount - 1) % freezeDashStyles.length] : null;
 
   if (view === 'dyno') {
     const hpArrRaw = hp_data_sets[hpKey].map(([r, hp]) => hp);
     const rpmArrRaw = hp_data_sets[hpKey].map(([r, hp]) => r);
     const engTq = hp_data_sets[hpKey].map(([rpm, hp]) => (hp * 5252) / rpm);
+    const currentColor = gear_colors[freezeCount % gear_colors.length];
     const dynoTraces = [
-      { x: rpmArrRaw, y: engTq, mode:'lines', showlegend:false, hoverinfo:'x+y', hovertemplate:'RPM: %{x} RPM<br>Torque: %{y:.1f} lb-ft<extra></extra>', line:{ color: gear_colors[0], shape:'spline', width:2 } },
-      { x: rpmArrRaw, y: hpArrRaw, mode:'lines', showlegend:false, hoverinfo:'x+y', hovertemplate:'RPM: %{x} RPM<br>HP: %{y:.1f}<extra></extra>', line:{ color: gear_colors[1], shape:'spline', width:2 } }
+      { x: rpmArrRaw, y: engTq, mode:'lines', showlegend:false, hoverinfo:'x+y', hovertemplate:'RPM: %{x} RPM<br>Torque: %{y:.1f} lb-ft<extra></extra>', line:{ color: currentColor, shape:'spline', width:2 } },
+      { x: rpmArrRaw, y: hpArrRaw, mode:'lines', showlegend:false, hoverinfo:'x+y', hovertemplate:'RPM: %{x} RPM<br>HP: %{y:.1f}<extra></extra>', line:{ color: currentColor, shape:'spline', width:2 } }
     ];
     const maxHP = Math.max(...hpArrRaw), maxTQ = Math.max(...engTq);
     const legendTraces = [
       { x:[null], y:[null], mode:'lines', name:hpKey, showlegend:true, hoverinfo:'skip', line:{ color:'rgba(0,0,0,0)', width:0 } },
-      { x:[null], y:[null], mode:'lines', name:`Max HP: ${maxHP.toFixed(1)}`, showlegend:true, hoverinfo:'skip', line:{ color:gear_colors[1], shape:'spline', width:2 } },
-      { x:[null], y:[null], mode:'lines', name:`Max TQ: ${maxTQ.toFixed(1)}`, showlegend:true, hoverinfo:'skip', line:{ color:gear_colors[0], shape:'spline', width:2 } }
+      { x:[null], y:[null], mode:'lines', name:`Max HP: ${maxHP.toFixed(1)}`, showlegend:true, hoverinfo:'skip', line:{ color:currentColor, shape:'spline', width:2 } },
+      { x:[null], y:[null], mode:'lines', name:`Max TQ: ${maxTQ.toFixed(1)}`, showlegend:true, hoverinfo:'skip', line:{ color:currentColor, shape:'spline', width:2 } }
     ];
     const dynoLayout = { title:'HP and Torque', xaxis:{ title:'RPM', color:'white', autorange:false, range:[rpmArrRaw[0], rpmArrRaw[rpmArrRaw.length-1] + 2000] }, yaxis:{ title:'HP / TQ', color:'white', autorange:false, range:[0, dynoMaxHP] }, plot_bgcolor:'#111', paper_bgcolor:'#111', font:{ color:'white' }, transition:{ duration:1000, easing:'cubic-in-out' }, hovermode:'closest', hoverdistance:10 };
     const allDynoTraces = [...dynoTraces, ...legendTraces, ...frozenTraces];
