@@ -2,17 +2,11 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Wheel Torque</title>
+  <title>ZX-4RR Dyno App</title>
   <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
   <style>
     body { background-color: #111; color: white; font-family: Arial, sans-serif; }
-    #plot {
-      width: 90%;
-      max-width: calc(100vh * (16 / 9));   /* Prevent width:height exceeding 16:9 */
-      aspect-ratio: 16 / 9;                 /* Always maintain 16:9 ratio */
-      max-height: 90vh;                     /* Ensure graph fits vertically in viewport */
-      margin: auto;
-    }
+    #plot { width: 90%; max-width: calc(100vh * (16 / 9)); aspect-ratio: 16 / 9; max-height: 90vh; margin: auto; }
     .controls { text-align: center; margin-bottom: 20px; }
     .controls > * { margin: 0 6px; }
     button { margin-left: 10px; }
@@ -45,14 +39,25 @@
       <option value="53">53</option>
     </select>
 
-    <label for="hpData">HP Data:</label>
+    <label for="hpData">ECU Tune:</label>
     <select id="hpData" onchange="plotTorque(true)"></select>
 
     <label for="viewSelect">View:</label>
     <select id="viewSelect" onchange="plotTorque(true)">
-      <option value="wheel" selected>Wheel TQ</option>
-      <option value="dyno">Dyno</option>
+      <option value="wheel" selected>Wheel Torque</option>
+      <option value="dyno">Power Curves</option>
+      <option value="accel_ts">Time vs Speed</option>
+      <option value="accel_td">Time vs Distance</option>
+      <option value="accel_tg">Time vs G</option>
+      <option value="accel_sg">Speed vs G</option>
     </select>
+
+    <!-- Accel-only controls -->
+    <label id="weightLbLabel" for="weightLb">Weight (lb):</label>
+    <input id="weightLb" type="number" value="580" min="300" max="1000" step="1" onchange="plotTorque(true)">
+
+    <label id="shiftMsLabel" for="shiftMs">Shift Time (ms):</label>
+    <input id="shiftMs" type="number" value="80" min="0" max="300" step="10" onchange="plotTorque(true)">
 
     <label id="clipControl">
       <input type="checkbox" id="truncateCross" onchange="plotTorque(false)">
@@ -65,29 +70,72 @@
 
   <div id="plot" style="position: relative;">
     <div id="freezeNotification" style="
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        background: rgba(255,255,255,0.9);
-        color: #111;
-        padding: 8px 12px;
-        border-radius: 4px;
-        font-weight: bold;
-        display: none;
-        z-index: 1000;
-    ">
+        position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+        background: rgba(255,255,255,0.9); color: #111; padding: 8px 12px;
+        border-radius: 4px; font-weight: bold; display: none; z-index: 1000;">
       Select New Options!
     </div>
   </div>
 
-  <script>
-    // -------- Constants & data --------
-    const primary_drive = 2.029;
-    const tire_circ_in  = 77.15;
-    const gear_ratios   = {1:2.92, 2:2.05, 3:1.62, 4:1.33, 5:1.15, 6:1.03};
+<script>
+// -------- Constants & data --------
+const primary_drive = 2.029;
+const tire_circ_in  = 77.15;
+const gear_ratios   = {1:2.92, 2:2.05, 3:1.62, 4:1.33, 5:1.15, 6:1.03};
 
-    const hp_data_sets = {
+// Accel sim
+function getMassLb() {
+  const el = document.getElementById('weightLb');
+  const v = el ? parseFloat(el.value) : 580;
+  return Number.isFinite(v) && v > 0 ? v : 580;
+}
+function getShiftMs() {
+  const el = document.getElementById('shiftMs');
+  const v = el ? parseFloat(el.value) : 80;
+  return Number.isFinite(v) && v >= 0 ? v : 80;
+}
+
+const Crr = 0.015;
+const CdA = 0.35;
+const rho_air = 1.225;
+const g_mps2 = 9.80665;
+const LB_TO_KG = 0.45359237;
+const LBF_FT_TO_NM = 1.3558179483;
+const IN_TO_M = 0.0254;
+const MPH_TO_MPS = 0.44704;
+const MPS_TO_MPH = 2.236936;
+const M_TO_FT = 3.28084;
+
+// Vertical label placement for Accel compare markers
+const ACCEL_LABEL_BASE = 0.97;
+const ACCEL_LABEL_STEP = 0.03;
+const ACCEL_SPEED_YMAX = 150;  // mph axis cap for accel_ts
+
+
+const wheel_radius_m = (tire_circ_in * IN_TO_M) / (2 * Math.PI);
+
+function speedToRpm(speed_mph, gear_ratio, final_drive) {
+  return speed_mph * (primary_drive * gear_ratio * final_drive * 1056) / tire_circ_in;
+}
+function rpmToSpeed(rpm, gear_ratio, final_drive) {
+  return rpm * tire_circ_in / (primary_drive * gear_ratio * final_drive * 1056);
+}
+function hpToWheelTorqueAt(rpmArr, hpArr, gear_ratio, final_drive) {
+  const overall = primary_drive * gear_ratio * final_drive;
+  return rpmArr.map((rpm, i) => (hpArr[i] * 5252 / rpm) * overall);
+}
+function lerp(x1, y1, x2, y2, y) { return x1 + (y - y1) * (x2 - x1) / (y2 - y1); }
+function interp1(xArr, yArr, x) {
+  if (x <= xArr[0]) return yArr[0];
+  if (x >= xArr[xArr.length - 1]) return yArr[yArr.length - 1];
+  let lo = 0, hi = xArr.length - 1;
+  while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (xArr[mid] <= x) lo = mid; else hi = mid; }
+  const x1 = xArr[lo], x2 = xArr[hi], y1 = yArr[lo], y2 = yArr[hi];
+  return y1 + (y2 - y1) * (x - x1) / (x2 - x1);
+}
+
+// Dense RPM array
+const hp_data_sets = {
   Stock: [
     3400,3500,3600,3700,3800,3900,4000,4100,4200,4300,4400,4500,4600,4700,4800,4900,5000,5100,5200,5300,5400,5500,5600,5700,5800,5900,6000,6100,6200,6300,6400,6500,6600,6700,6800,6900,7000,7100,7200,7300,7400,7500,7600,7700,7800,7900,8000,8100,8200,8300,8400,8500,8600,8700,8800,8900,9000,9100,9200,9300,9400,9500,9600,9700,9800,9900,10000,10100,10200,10300,10400,10500,10600,10700,10800,10900,11000,11100,11200,11300,11400,11500,11600,11700,11800,11900,12000,12100,12200,12300,12400,12500,12600,12700,12800,12900,13000,13100,13200,13300,13400,13500,13600,13700,13800,13900,14000,14100,14200,14300,14400,14500,14600,14700,14800,14900,15000,15100,15200,15300,15400,15500,15600,15700,15800,15900,16000
   ].map((rpm, i) => [rpm, [
@@ -98,664 +146,459 @@
   ].map((rpm, i) => [rpm, [
     12.93,13.75,14.72,15.27,15.82,16.23,16.64,17.05,17.47,17.74,18.15,18.43,18.7,19.12,19.53,20.22,20.9,21.18,21.73,22.14,22.69,23.1,23.79,24.07,24.2,24.89,25.58,26.4,26.68,27.09,27.64,28.06,28.47,29.02,29.43,29.98,30.53,31.08,31.77,32.32,33.01,33.56,34.24,35.07,35.62,36.17,36.58,37.27,37.68,38.37,39.06,39.61,40.02,40.57,41.26,42.08,42.91,44.28,45.11,45.93,46.48,47.03,47.45,47.86,48.13,48.68,49.23,50.06,50.88,51.43,52.12,53.08,53.91,54.73,55.7,56.39,57.07,57.62,58.04,58.86,59.96,60.24,60.37,60.65,61.2,61.34,61.61,62.02,62.71,63.26,63.67,64.22,64.77,65.6,65.87,66.01,66.84,67.39,67.94,68.49,68.62,69.17,69.72,70.55,71.1,71.24,71.38,71.38,71.51,71.51,71.24,70.83,70.41,70.14,69.59,69.04,68.21,67.11,66.42,65.74,65.05,64.22,63.4,62.44,61.47,60.51,59.55
   ][i]]),
-  'Graves Full Exh': [
+  "Graves Full Exh": [
     3400,3500,3600,3700,3800,3900,4000,4100,4200,4300,4400,4500,4600,4700,4800,4900,5000,5100,5200,5300,5400,5500,5600,5700,5800,5900,6000,6100,6200,6300,6400,6500,6600,6700,6800,6900,7000,7100,7200,7300,7400,7500,7600,7700,7800,7900,8000,8100,8200,8300,8400,8500,8600,8700,8800,8900,9000,9100,9200,9300,9400,9500,9600,9700,9800,9900,10000,10100,10200,10300,10400,10500,10600,10700,10800,10900,11000,11100,11200,11300,11400,11500,11600,11700,11800,11900,12000,12100,12200,12300,12400,12500,12600,12700,12800,12900,13000,13100,13200,13300,13400,13500,13600,13700,13800,13900,14000,14100,14200,14300,14400,14500,14600,14700,14800,14900,15000,15100,15200,15300,15400,15500,15600,15700,15800,15900,16000
   ].map((rpm, i) => [rpm, [
     12.88,13.31,13.74,14.31,15.17,15.6,16.03,16.6,17.46,17.89,18.32,18.89,19.46,19.89,20.32,20.89,21.61,22.18,22.75,23.33,23.9,24.47,24.9,25.33,25.62,25.9,26.48,27.05,27.33,27.76,28.34,28.91,29.48,30.05,30.48,30.77,31.48,31.63,32.06,32.63,33.35,33.77,34.35,34.92,35.78,36.64,37.07,37.64,38.21,39.07,39.64,40.07,40.79,42.79,44.65,45.8,46.94,48.37,48.8,48.94,49.09,49.37,49.66,50.23,50.66,51.23,51.81,52.67,53.52,54.24,54.96,56.1,56.96,57.82,59.25,59.82,60.68,61.68,62.54,62.54,63.26,63.54,63.97,64.26,64.54,64.83,64.83,64.97,65.69,65.97,66.69,67.12,67.69,68.26,69.12,69.84,70.41,70.98,71.84,72.7,72.84,73.27,74.13,74.42,74.42,74.42,74.42,74.42,74.7,74.85,74.85,74.42,73.99,73.85,73.56,73.13,72.7,71.99,71.41,70.7,70.27,69.27,68.84,68.12,67.26,65.97,65.55
   ][i]]),
-  'M4 Full Exh': [
-    3400,3500,3600,3700,3800,3900,4000,4100,4200,4300,4400,4500,4600,4700,4800,4900,5000,5100,5200,5300,5400,5500,5600,5700,5800,5900,6000,6100,6200,6300,6400,6500,6600,6700,6800,6900,7000,7100,7200,7300,7400,7500,7600,7700,7800,7900,8000,8100,8200,8300,8400,8500,8600,8700,8800,8900,9000,9100,9200,9300,9400,9500,9600,9700,9800,9900,10000,10100,10200,10300,10400,10500,10600,10700,10800,10900,11000,11100,11200,11300,11400,11500,11600,11700,11800,11900,12000,12100,12200,12300,12400,12500,12600,12700,12800,12900,13000,13100,13200,13300,13400,13500,13600,13700,13800,13900,14000,14100,14200,14300,14400,14500,14600,14700,14800,14900,15000,15100,15200,15300,15400,15500,15600,15700,15800,15900,16000  
+  "M4 Full Exh": [
+    3400,3500,3600,3700,3800,3900,4000,4100,4200,4300,4400,4500,4600,4700,4800,4900,5000,5100,5200,5300,5400,5500,5600,5700,5800,5900,6000,6100,6200,6300,6400,6500,6600,6700,6800,6900,7000,7100,7200,7300,7400,7500,7600,7700,7800,7900,8000,8100,8200,8300,8400,8500,8600,8700,8800,8900,9000,9100,9200,9300,9400,9500,9600,9700,9800,9900,10000,10100,10200,10300,10400,10500,10600,10700,10800,10900,11000,11100,11200,11300,11400,11500,11600,11700,11800,11900,12000,12100,12200,12300,12400,12500,12600,12700,12800,12900,13000,13100,13200,13300,13400,13500,13600,13700,13800,13900,14000,14100,14200,14300,14400,14500,14600,14700,14800,14900,15000,15100,15200,15300,15400,15500,15600,15700,15800,15900,16000
   ].map((rpm, i) => [rpm, [
-      13.3,13.8,14.18,14.47,15.04,15.32,15.74,16.17,16.6,17.02,17.87,18.44,19.15,19.86,20.57,21.28,21.7,21.99,22.41,22.84,23.55,24.4,25.11,25.96,26.67,27.23,27.94,28.65,29.22,29.93,30.35,30.92,31.63,32.34,33.05,33.48,33.9,34.33,34.75,35.18,35.6,36.03,36.6,37.16,37.59,37.73,38.3,38.87,39.43,40.0,40.43,41.7,42.84,44.11,45.39,46.67,47.94,48.94,49.5,49.93,50.35,50.78,50.92,51.35,52.06,52.48,53.05,53.33,53.76,54.75,56.03,56.74,57.73,58.58,59.57,60.43,60.99,62.27,62.84,63.55,63.97,64.4,64.96,65.11,65.53,65.96,66.52,66.95,67.23,67.66,68.09,68.79,69.36,70.07,70.64,71.21,71.77,72.34,72.91,73.76,74.18,74.75,75.32,75.74,76.31,76.6,76.74,76.74,76.74,76.74,76.45,76.17,76.03,75.46,75.04,74.61,74.33,73.62,73.05,72.62,72.06,71.63,70.78,70.21,69.22,68.09,67.94  ][i]]),
-  'Lo-Mnt/Stacks': [
+    13.3,13.8,14.18,14.47,15.04,15.32,15.74,16.17,16.6,17.02,17.87,18.44,19.15,19.86,20.57,21.28,21.7,21.99,22.41,22.84,23.55,24.4,25.11,25.96,26.67,27.23,27.94,28.65,29.22,29.93,30.35,30.92,31.63,32.34,33.05,33.48,33.9,34.33,34.75,35.18,35.6,36.03,36.6,37.16,37.59,37.73,38.3,38.87,39.43,40.0,40.43,41.7,42.84,44.11,45.39,46.67,47.94,48.94,49.5,49.93,50.35,50.78,50.92,51.35,52.06,52.48,53.05,53.33,53.76,54.75,56.03,56.74,57.73,58.58,59.57,60.43,60.99,62.27,62.84,63.55,63.97,64.4,64.96,65.11,65.53,65.96,66.52,66.95,67.23,67.66,68.09,68.79,69.36,70.07,70.64,71.21,71.77,72.34,72.91,73.76,74.18,74.75,75.32,75.74,76.31,76.6,76.74,76.74,76.74,76.74,76.74,76.45,76.17,76.03,75.46,75.04,74.61,74.33,73.62,73.05,72.62,72.06,71.63,70.78,70.21,69.22,68.09,67.94
+  ][i]]),
+  "Lo-Mnt/Stacks": [
     3400,3500,3600,3700,3800,3900,4000,4100,4200,4300,4400,4500,4600,4700,4800,4900,5000,5100,5200,5300,5400,5500,5600,5700,5800,5900,6000,6100,6200,6300,6400,6500,6600,6700,6800,6900,7000,7100,7200,7300,7400,7500,7600,7700,7800,7900,8000,8100,8200,8300,8400,8500,8600,8700,8800,8900,9000,9100,9200,9300,9400,9500,9600,9700,9800,9900,10000,10100,10200,10300,10400,10500,10600,10700,10800,10900,11000,11100,11200,11300,11400,11500,11600,11700,11800,11900,12000,12100,12200,12300,12400,12500,12600,12700,12800,12900,13000,13100,13200,13300,13400,13500,13600,13700,13800,13900,14000,14100,14200,14300,14400,14500,14600,14700,14800,14900,15000,15100,15200,15300,15400,15500,15600,15700,15800,15900,16000
   ].map((rpm, i) => [rpm, [
     12.37,13.07,13.49,14.18,15.3,16.0,16.27,16.83,17.53,18.09,18.65,19.34,19.9,20.46,21.02,21.57,21.99,22.41,22.83,23.39,23.94,24.5,25.06,25.62,25.62,26.73,27.15,27.43,27.99,28.41,29.1,29.52,29.94,30.5,31.06,31.47,32.03,32.45,33.01,33.43,33.98,34.54,35.24,36.08,36.77,37.33,38.03,38.45,39.0,39.42,39.7,40.82,41.65,42.35,43.47,44.58,45.56,46.81,47.93,49.04,50.16,51.0,51.69,52.53,53.23,53.92,54.34,55.04,55.74,56.57,57.27,58.11,58.8,59.5,60.34,60.9,61.31,61.73,62.01,62.57,62.99,63.55,63.96,64.24,64.8,65.36,65.78,66.2,66.61,67.17,67.73,68.43,69.12,69.54,70.38,71.08,71.77,72.47,73.31,73.86,74.42,74.98,75.4,75.82,76.1,76.37,76.51,76.93,76.93,77.07,77.07,77.07,77.07,76.65,76.37,76.1,75.96,75.54,75.26,74.84,74.7,74.42,74.14,74.0,73.45,73.31,73.03
   ][i]])
-    }
-  // "ACME Slip-on": [
-  //   3500, 4000, 4500, 5000, 5500, 6000, 6500, 7000, 7500,
-  //   8000, 8500, 9000, 9500, 10000, 10500, 11000, 11500, 12000,
-  //   12500, 13000, 13500, 14000, 14250, 14500, 15000, 15500, 16000
-  // ].map((rpm, i) => [rpm, [
-  //   14.07, 17.54, 19.64, 22.16, 24.26, 26.99, 29.61, 32.24, 34.76,
-  //   38.01, 40.74, 44.94, 49.35, 51.66, 55.23, 59.64, 63.00, 64.68,
-  //   66.68, 71.41, 74.03, 77.66, 78.29, 79.92, 78.19, 74.48, 67.73
-  // ][i]])
-  // ,
+};
 
-  // "Ninja 400": [
-  //   3700, 3800, 3900, 4000, 4100, 4200, 4300, 4400, 4500, 4600,
-  //   4700, 4800, 4900, 5000, 5100, 5200, 5300, 5400, 5500, 5600,
-  //   5700, 5800, 5900, 6000, 6100, 6200, 6300, 6400, 6500, 6600,
-  //   6700, 6800, 6900, 7000, 7100, 7200, 7300, 7400, 7500, 7600,
-  //   7700, 7800, 7900, 8000, 8100, 8200, 8300, 8400, 8500, 8600,
-  //   8700, 8800, 8900, 9000, 9100, 9200, 9300, 9400, 9500, 9600,
-  //   9700, 9800, 9900, 10000, 10100, 10200, 10300, 10400, 10500,
-  //   10600, 10700, 10800, 10900, 11000, 11100, 11200, 11300, 11400,
-  //   11500, 11600, 11700, 11800, 11900, 12000, 12100
-  // ].map((rpm, i) => [rpm, [
-  //   13.05,14.22,15.28,16.0,17.06,17.84,18.51,19.28,19.73,20.45,21.18,21.68,22.18,22.46,22.73,23.07,23.29,23.85,24.35,24.68,25.52,26.24,26.85,27.41,27.52,27.52,27.85,28.8,30.14,30.52,31.19,31.92,32.58,33.14,33.7,34.42,35.2,35.81,36.09,36.09,36.53,37.59,38.48,39.15,39.87,40.65,40.93,41.21,41.43,41.65,42.21,42.38,42.66,42.99,43.49,43.93,44.49,44.94,45.05,45.05,45.05,45.05,45.05,45.05,44.94,44.77,44.49,44.1,43.82,43.71,43.66,43.6,43.49,43.27,43.27,43.27,43.04,42.77,42.77,42.6,42.49,42.49,42.21,41.88,41.88
-  // ][i]])
-
-
-
-    // Precompute Dyno view y-axis maximum based on max HP across all datasets
-    const dynoMaxHP = (() => {
-      let maxVal = 0;
-      Object.values(hp_data_sets).forEach(arr => {
-        arr.forEach(([rpm, v]) => { if (v > maxVal) maxVal = v; });
-      });
-      // Round up to nearest 10
-      return Math.ceil(maxVal / 10) * 10;
-    })();
-
-    const gear_colors = ['#FF0000', '#00FFFF', '#00FF00', '#FFFF00', '#F012BE', '#FFFFFF'];
-
-    // Available dash styles for frozen traces
-    const freezeDashStyles = ['dot', 'dash', 'longdash', 'dashdot', 'solid'];
-    let freezeCount = 0;
-
-    // Number of interpolated data points per curve
-    const densePoints = 750;
-
-    // Compute min/max RPMs from data sets
-    const rpm_data_raw = hp_data_sets[Object.keys(hp_data_sets)[0]].map(([r, _]) => r);
-    // Create a dense RPM array from min to max of rpm_data
-    const rpmDense = (() => {
-      const arr = [];
-      const minR = rpm_data_raw[0];
-      const maxR = rpm_data_raw[rpm_data_raw.length - 1];
-      for (let i = 0; i <= densePoints; i++) {
-        arr.push(minR + (maxR - minR) * (i / densePoints));
-      }
-      return arr;
-    })();
-
-    // Generate dense HP datasets by interpolating original dyno data
-    const hpDenseSets = {};
-    for (const key in hp_data_sets) {
-      const rpmArrRaw = hp_data_sets[key].map(([r, hp]) => r);
-      const hpArrRaw = hp_data_sets[key].map(([r, hp]) => hp);
-      hpDenseSets[key] = rpmDense.map(r => interp1(rpmArrRaw, hpArrRaw, r));
-    }
-
-    // Populate HP Data dropdown with available datasets
-    function populateHpDropdown() {
-      const sel = document.getElementById('hpData');
-      sel.innerHTML = '';
-      const keys = Object.keys(hp_data_sets);
-      keys.forEach(k => {
-        const opt = document.createElement('option');
-        opt.value = k;
-        opt.textContent = k;
-        sel.appendChild(opt);
-      });
-      // Default to Stock if present, otherwise first key
-      if (keys.includes('Stock')) sel.value = 'Stock';
-      else if (keys.length) sel.value = keys[0];
-    }
-
-    // -------- Globals --------
+const gear_colors = ['#FF0000', '#00FFFF', '#00FF00', '#FFFF00', '#F012BE', '#FFFFFF'];
+const freezeDashStyles = ['dot', 'dash', 'longdash', 'dashdot', 'solid'];
+let freezeCount = 0;
+let frozenConfigurations = []; // Store configurations instead of traces
 let frozenTraces = [];
 let frozenConnectorTraces = [];
 let previousTraces = [];
 let maxX = 0, maxY = 0;
+let lastFamily = null;
 
-let lastView = null;
+const densePoints = 750;
+const rpm_data_raw = hp_data_sets[Object.keys(hp_data_sets)[0]].map(([r, _]) => r);
+const rpmDense = (() => {
+  const arr = [];
+  const minR = rpm_data_raw[0];
+  const maxR = rpm_data_raw[rpm_data_raw.length - 1];
+  for (let i = 0; i <= densePoints; i++) arr.push(minR + (maxR - minR) * (i / densePoints));
+  return arr;
+})();
+const hpDenseSets = {};
+for (const key in hp_data_sets) {
+  const rpmArrRaw = hp_data_sets[key].map(([r, hp]) => r);
+  const hpArrRaw = hp_data_sets[key].map(([r, hp]) => hp);
+  hpDenseSets[key] = rpmDense.map(r => interp1(rpmArrRaw, hpArrRaw, r));
+}
 
-    // -------- Helpers --------
-    function rpmToSpeed(rpm, gear_ratio, final_drive) {
-      return rpm * tire_circ_in / (primary_drive * gear_ratio * final_drive * 1056);
+// Utility
+function viewFamily(v) { return v === 'wheel' ? 'wheel' : (v === 'dyno' ? 'dyno' : (v.startsWith('accel') ? 'accel' : v)); }
+
+// Generate frozen traces from stored configurations for current view
+function regenerateFrozenTraces() {
+  frozenTraces = [];
+  frozenConnectorTraces = [];
+  
+  const currentView = document.getElementById('viewSelect').value;
+  const currentFamily = viewFamily(currentView);
+  
+  frozenConfigurations.forEach((config, configIndex) => {
+    const dashStyle = freezeDashStyles[configIndex % freezeDashStyles.length];
+    const { front, rear, hpKey, weightLb, shiftMs } = config;
+    const fd = rear / front;
+    const rpmArr = rpmDense;
+    const hpArr = hpDenseSets[hpKey];
+    
+    // Add spacer for legend grouping
+    frozenTraces.push({ x:[null], y:[null], mode:'lines', name:'\u00A0', showlegend:true, hoverinfo:'skip', line:{color:'rgba(0,0,0,0)', width:0} });
+    
+    if (currentFamily === 'dyno') {
+      const hpArrRaw = hp_data_sets[hpKey].map(([r, hp]) => hp);
+      const rpmArrRaw = hp_data_sets[hpKey].map(([r, hp]) => r);
+      const engTq = hp_data_sets[hpKey].map(([rpm, hp]) => (hp * 5252) / rpm);
+      frozenTraces.push({ x:rpmArrRaw, y:engTq, mode:'lines', showlegend:false, hoverinfo:'x+y', hovertemplate:'RPM: %{x} RPM<br>Torque: %{y:.1f} lb-ft<extra></extra>', line:{ color: gear_colors[0], shape:'spline', dash: dashStyle, width:2 }, opacity:0.3 });
+      frozenTraces.push({ x:rpmArrRaw, y:hpArrRaw, mode:'lines', showlegend:false, hoverinfo:'x+y', hovertemplate:'RPM: %{x} RPM<br>HP: %{y:.1f}<extra></extra>', line:{ color: gear_colors[1], shape:'spline', dash: dashStyle, width:2 }, opacity:0.3 });
+      const maxHP = Math.max(...hpArrRaw), maxTQ = Math.max(...engTq);
+      frozenTraces.push({ x:[null], y:[null], mode:'lines', name:hpKey, showlegend:true, hoverinfo:'skip', line:{ color:'rgba(0,0,0,0)', width:0 } });
+      frozenTraces.push({ x:[null], y:[null], mode:'lines', name:`Max HP: ${maxHP.toFixed(1)}`, showlegend:true, hoverinfo:'skip', line:{ color:gear_colors[1], shape:'spline', dash:dashStyle, width:2 } });
+      frozenTraces.push({ x:[null], y:[null], mode:'lines', name:`Max TQ: ${maxTQ.toFixed(1)}`, showlegend:true, hoverinfo:'skip', line:{ color:gear_colors[0], shape:'spline', dash:dashStyle, width:2 } });
     }
-
-    function hpToWheelTorqueAt(rpmArr, hpArr, gear_ratio, final_drive) {
-      const overall = primary_drive * gear_ratio * final_drive;
-      return rpmArr.map((rpm, i) => (hpArr[i] * 5252 / rpm) * overall);
-    }
-
-    function lerp(x1, y1, x2, y2, y) {
-      return x1 + (y - y1) * (x2 - x1) / (y2 - y1);
-    }
-
-    function interp1(xArr, yArr, x) {
-      if (x <= xArr[0]) return yArr[0];
-      if (x >= xArr[xArr.length - 1]) return yArr[yArr.length - 1];
-      let lo = 0, hi = xArr.length - 1;
-      while (hi - lo > 1) {
-        const mid = (lo + hi) >> 1;
-        if (xArr[mid] <= x) lo = mid; else hi = mid;
-      }
-      const x1 = xArr[lo], x2 = xArr[hi];
-      const y1 = yArr[lo], y2 = yArr[hi];
-      return y1 + (y2 - y1) * (x - x1) / (x2 - x1);
-    }
-
-    // Compute optimal crossover shift RPMs and speeds
-    function computeShiftPoints(hpArr, final_drive, rpmArr) {
-      const wt = {}, spd = {};
-      for (let g = 1; g <= 6; g++) {
-        wt[g]  = hpToWheelTorqueAt(rpmArr, hpArr,      gear_ratios[g], final_drive);
-        spd[g] = rpmArr.map(rpm => rpmToSpeed(rpm, gear_ratios[g], final_drive));
-      }
-
-      const shift_rpm   = {};
-      const shift_speed = {};
-
-      for (let g = 1; g <= 5; g++) {
-        const ratio  = gear_ratios[g + 1] / gear_ratios[g];
-        const diff   = [];
-
-        for (let i = 0; i < rpmArr.length; i++) {
-          const rp    = rpmArr[i];
-          const curTq = wt[g][i];
-          const nxtTq = interp1(rpmArr, wt[g + 1], rp * ratio);
-          diff.push(nxtTq - curTq);
-        }
-
-        let idx = diff.findIndex(d => d >= 0);
-        let shiftRPM;
-        if (idx === -1) {
-          shiftRPM = rpmArr[rpmArr.length - 1];
-        } else if (idx === 0) {
-          shiftRPM = rpmArr[0];
-        } else {
-          shiftRPM = lerp(
-            rpmArr[idx - 1], diff[idx - 1],
-            rpmArr[idx],     diff[idx],
-            0
-          );
-        }
-
-        shift_rpm[g]   = shiftRPM;
-        shift_speed[g] = rpmToSpeed(shiftRPM, gear_ratios[g], final_drive);
-      }
-
-      return { wt, spd, shift_rpm, shift_speed };
-    }
-
-    // Pre-compute axis bounds
-    function getPlotBounds() {
-      const all_hp = Object.values(hp_data_sets);
-      const fd_ratios = [48/13, 48/14, 50/13, 50/14];
-      for (const gr of Object.values(gear_ratios)) {
-        for (const hpArr of all_hp) {
-          const rpmArrRaw = hpArr.map(([r, hp]) => r);
-          const hpArrRaw = hpArr.map(([r, hp]) => hp);
-          for (const fd of fd_ratios) {
-            for (let i = 0; i < rpmArrRaw.length; i++) {
-              const rpm = rpmArrRaw[i];
-              const hp = hpArrRaw[i];
-              const speed = rpmToSpeed(rpm, gr, fd);
-              const tq    = (hp * 5252 / rpm) * (primary_drive * gr * fd);
-              if (speed > maxX) maxX = speed;
-              if (tq    > maxY) maxY = tq;
-            }
-          }
-        }
-      }
-      maxY = Math.ceil(maxY / 100) * 100;
-    }
-
-    // Freeze and clear functions
-    function freezeCurrentTraces() {
-      // Detect current view at the very top
-      const view = document.getElementById('viewSelect').value;
-
-      // Handle Dyno view separately
-      if (view === 'dyno') {
-        freezeCount++;
-        // Spacer to separate this frozen Dyno set in the legend
-        frozenTraces.push({
-          x: [null], y: [null],
-          mode: 'lines',
-          name: '\u00A0',  // non-breaking blank entry
-          showlegend: true,
-          hoverinfo: 'skip',
-          line: { color: 'rgba(0,0,0,0)', width: 0 }
+    else if (currentFamily === 'accel') {
+      const sim = simulateAccel(hpArr, rpmArr, fd, 0.02, weightLb, shiftMs);
+      let xData, yData, showShift = false;
+      if (currentView === 'accel_ts') { xData = sim.T; yData = sim.V; showShift = true; }
+      else if (currentView === 'accel_td') { xData = sim.T; yData = sim.S; }
+      else if (currentView === 'accel_tg') { xData = sim.T; yData = sim.A.map(a=>a/g_mps2); }
+      else if (currentView === 'accel_sg') { xData = sim.V; yData = sim.A.map(a=>a/g_mps2); }
+      else { xData = sim.T; yData = sim.V; }
+      
+      const lineColor = gear_colors[configIndex % gear_colors.length];
+      frozenTraces.push({ x:[null], y:[null], mode:'lines', name:`(F${front}/R${rear} ${hpKey})`, showlegend:true, hoverinfo:'skip', line:{color:lineColor, width:2, dash: dashStyle, shape:'spline'} });
+      frozenTraces.push({ x:xData, y:yData, mode:'lines', showlegend:false, hoverinfo:'x+y', line:{ color: lineColor, width:2, dash: dashStyle, shape:'spline' }, opacity:0.7 });
+      
+      if (showShift) {
+        sim.shiftMarkers.forEach(m => {
+          const yLabelPos = Math.max(0, (ACCEL_LABEL_BASE - configIndex * ACCEL_LABEL_STEP) * ACCEL_SPEED_YMAX);
+          frozenConnectorTraces.push({ x:[m.t, m.t], y:[yLabelPos, m.v_mph], mode:'lines', line:{ color: gear_colors[m.gear-1], width:1, dash: dashStyle }, showlegend:false, hoverinfo:'skip', yaxis:'y' });
+          frozenConnectorTraces.push({ x:[m.t], y:[yLabelPos], mode:'text', text:[`${m.t.toFixed(2)} s`], textposition:'top center', textfont:{ color: gear_colors[m.gear-1] }, showlegend:false, hoverinfo:'skip', cliponaxis:false });
         });
-        // Pick unique dash style per freeze, cycling with modulo
-        const dashStyle = freezeDashStyles[(freezeCount - 1) % freezeDashStyles.length];
-        // Dyno freeze legend: DataSet name, Max HP, Max TQ
-        const hn = document.getElementById("hpData").value;
-        const hpArrRaw = hp_data_sets[hn].map(([r, hp]) => hp);
-        const rpmArrRaw = hp_data_sets[hn].map(([r, hp]) => r);
-        const engTq = hp_data_sets[hn].map(([rpm, hp]) => (hp * 5252) / rpm);
-        // Clone Dyno torque curve for freezing (no legend entry), enable hover
-        frozenTraces.push({
-          x: rpmArrRaw,
-          y: engTq,
-          mode: 'lines',
-          showlegend: false,
-          hoverinfo: 'x+y',
-          hovertemplate: 'RPM: %{x} RPM<br>Torque: %{y:.1f} lb-ft<extra></extra>',
-          line: { color: gear_colors[0], shape: 'spline', dash: dashStyle, width: 2 },
-          opacity: 0.3
-        });
-        // Clone Dyno HP curve for freezing (no legend entry), enable hover
-        frozenTraces.push({
-          x: rpmArrRaw,
-          y: hpArrRaw,
-          mode: 'lines',
-          showlegend: false,
-          hoverinfo: 'x+y',
-          hovertemplate: 'RPM: %{x} RPM<br>HP: %{y:.1f}<extra></extra>',
-          line: { color: gear_colors[1], shape: 'spline', dash: dashStyle, width: 2 },
-          opacity: 0.3
-        });
-        const maxHP = Math.max(...hpArrRaw);
-        const maxTQ = Math.max(...engTq);
-        // Legend entries
-        frozenTraces.push({
-          x: [null], y: [null], mode: 'lines',
-          name: hn, showlegend: true, hoverinfo: 'skip',
-          line: { color: 'rgba(0,0,0,0)', width: 0 }
-        });
-        frozenTraces.push({
-          x: [null], y: [null], mode: 'lines',
-          name: `Max HP: ${maxHP.toFixed(1)}`, showlegend: true, hoverinfo: 'skip',
-          line: {
-            color: gear_colors[1],
-            shape: 'spline',
-            dash: dashStyle,
-            width: 2
-          }
-        });
-        frozenTraces.push({
-          x: [null], y: [null], mode: 'lines',
-          name: `Max TQ: ${maxTQ.toFixed(1)}`, showlegend: true, hoverinfo: 'skip',
-          line: {
-            color: gear_colors[0],
-            shape: 'spline',
-            dash: dashStyle,
-            width: 2
-          }
-        });
-        // Notification
-        const notif = document.getElementById('freezeNotification');
-        notif.style.display = 'block';
-        setTimeout(() => { notif.style.display = 'none'; }, 2000);
-        // Redraw including frozen Dyno traces
-        plotTorque(false);
-        return;
       }
-
-      // Wheel TQ view
-      if (!previousTraces.length) return;
-      freezeCount++;
-      // Insert spacer to separate the new frozen set in the legend
-      frozenTraces.push({
-        x: [null], y: [null],
-        mode: 'lines',
-        name: ' ',  // blank legend entry
-        showlegend: true,
-        hoverinfo: 'skip',
-        line: { color: 'rgba(0,0,0,0)', width: 0 }
-      });
-      // Pick unique dash style per freeze, cycling with modulo
-      const dashStyle = freezeDashStyles[(freezeCount - 1) % freezeDashStyles.length];
-      const f = document.getElementById("front").value;
-      const r = document.getElementById("rear").value;
-      const hn = document.getElementById("hpData").value;
-      // Add a single group label trace for this freeze (smoothed)
-      const groupLabel = `(F${f}/R${r} ${hn})`;
-      frozenTraces.push({
-        x: [null], y: [null],
-        mode: 'lines',
-        name: groupLabel,
-        showlegend: true,
-        hoverinfo: 'skip',
-        line: {
-          color: gear_colors[0],
-          width: 2,
-          dash: dashStyle,
-          shape: 'spline'   // ensure smoothing
-        }
-      });
-
-      // Clone only gear traces (skip connectors) to freeze, preserving hoverability
-      previousTraces
-        .filter(trace => trace.name && trace.name.startsWith('Gear '))
-        .forEach(trace => {
-          frozenTraces.push({
-            x: trace.x,
-            y: trace.y,
-            customdata: trace.customdata,        // preserve RPM data for hover
-            mode: trace.mode,
-            name: trace.name,                    // original gear label only
-            showlegend: true,
-            hovertemplate: trace.hovertemplate,  // preserve the same hover template
-            line: { ...trace.line, dash: dashStyle, opacity: 0.3 }
-          });
-        });
-
-      // Compute shift points for this frozen set
-      const fdFrozen = r / f;
-      const hpArrFrozen = hpDenseSets[hn];
-      const { wt: frozenWt, shift_rpm: frozenShiftRpm, shift_speed: frozenShiftSpeed } =
-        computeShiftPoints(hpArrFrozen, fdFrozen, rpmDense);
-
-      // Add frozen connector traces (vertical lines and labels)
-      const baseRatio = 0.97, stepRatio = 0.03;
-      frozenShiftSpeed && Object.keys(frozenShiftSpeed).forEach(gKey => {
-        const g = parseInt(gKey);
-        const xShift = frozenShiftSpeed[g];
-        if (xShift != null) {
-          const yLabel = Math.max(0, baseRatio - (freezeCount - 1) * stepRatio) * maxY;
-          // Compute torque at the start of the next gear curve for frozen data
-          const speedsNextFrozen = rpmDense.map(r => rpmToSpeed(r, gear_ratios[g + 1], fdFrozen));
-          const idxNextFrozen = speedsNextFrozen.findIndex(s => s >= xShift);
-          const torqueNextFrozen = idxNextFrozen !== -1 ? frozenWt[g + 1][idxNextFrozen] : 0;
-          // Draw vertical line from just below label down to next gear start torque
-          frozenConnectorTraces.push({
-            x: [xShift, xShift],
-            y: [yLabel, torqueNextFrozen],
-            mode: 'lines',
-            line: { color: gear_colors[g - 1], width: 1, dash: dashStyle },
-            showlegend: false,
-            hoverinfo: 'skip'
-          });
-          // Label
-          frozenConnectorTraces.push({
-            x: [xShift],
-            y: [yLabel],
-            mode: 'text',
-            text: [`${xShift.toFixed(1)} MPH`],
-            textposition: 'top center',
-            textfont: { color: gear_colors[g - 1] },
-            showlegend: false,
-            hoverinfo: 'skip',
-            cliponaxis: false
-          });
-        }
-      });
-
-      // Show temporary freeze notification
-      const notif = document.getElementById('freezeNotification');
-      notif.style.display = 'block';
-      setTimeout(() => { notif.style.display = 'none'; }, 2000);
-
-      // Redraw baseline to include frozen traces without animation
-      plotTorque(false);
     }
-
-    function clearFrozenTraces() {
-      // Reset controls to default values
-      document.getElementById("front").value = "14";
-      document.getElementById("rear").value = "48";
-      document.getElementById("hpData").value = "Stock";
-      document.getElementById("truncateCross").checked = false;
-
-      frozenTraces = [];
-      freezeCount = 0;  // Reset label offset counter
-      frozenConnectorTraces = [];
-      plotTorque();
-    }
-
-    // Main plotting routine
-    function plotTorque(animate = true) {
-      // Determine which view is selected
-      const view = document.getElementById('viewSelect').value;
-      // Show Clip Lines checkbox only in Wheel TQ view
-      const clipEl = document.getElementById('clipControl');
-      clipEl.style.display = (view === 'wheel') ? 'inline-block' : 'none';
-      // If switching between Dyno and Wheel views, clear any frozen legend entries
-      if (lastView !== null && view !== lastView) {
-        frozenTraces = [];
-        frozenConnectorTraces = [];
-        freezeCount = 0;
-        previousTraces = [];
-      }
-      lastView = view;
-      const front = parseInt(document.getElementById("front").value);
-      const rear  = parseInt(document.getElementById("rear").value);
-      const hpKey = document.getElementById("hpData").value;
-      const rpmArr = rpmDense;
-      const hpArr  = hpDenseSets[hpKey];
-      const fd = rear / front;
-      // Only apply dash style to new live traces after the first freeze+update
-      const activeDash = (freezeCount > 1 && animate)
-        ? freezeDashStyles[(freezeCount - 1) % freezeDashStyles.length]
-        : null;
-
-      // Branch for Dyno view
-      if (view === 'dyno') {
-        const hpArrRaw = hp_data_sets[hpKey].map(([r, hp]) => hp);
-        const rpmArrRaw = hp_data_sets[hpKey].map(([r, hp]) => r);
-        // Engine torque from HP = (HP * 5252 / RPM)
-        const engTq = hp_data_sets[hpKey].map(([rpm, hp]) => (hp * 5252) / rpm);
-        const dynoTraces = [
-          {
-            x: rpmArrRaw,
-            y: engTq,
-            mode: 'lines',
-            showlegend: false,
-            hoverinfo: 'x+y',
-            hovertemplate: 'RPM: %{x} RPM<br>Torque: %{y:.1f} lb-ft<extra></extra>',
-            line: { color: gear_colors[0], shape: 'spline', width: 2 }
-          },
-          {
-            x: rpmArrRaw,
-            y: hpArrRaw,
-            mode: 'lines',
-            showlegend: false,
-            hoverinfo: 'x+y',
-            hovertemplate: 'RPM: %{x} RPM<br>HP: %{y:.1f}<extra></extra>',
-            line: { color: gear_colors[1], shape: 'spline', width: 2 }
-          }
-        ];
-        // Compute maximum dyno values
-        const maxHP = Math.max(...hpArrRaw);
-        const maxTQ = Math.max(...engTq);
-        // Legend entries: Data set name, Max HP, Max TQ
-        const legendTraces = [
-          {
-            x: [null], y: [null],
-            mode: 'lines',
-            name: hpKey,
-            showlegend: true,
-            hoverinfo: 'skip',
-            line: { color: 'rgba(0,0,0,0)', width: 0 }
-          },
-          {
-            x: [null], y: [null],
-            mode: 'lines',
-            name: `Max HP: ${maxHP.toFixed(1)}`,
-            showlegend: true,
-            hoverinfo: 'skip',
-            line: { color: gear_colors[1], shape: 'spline', width: 2 }
-          },
-          {
-            x: [null], y: [null],
-            mode: 'lines',
-            name: `Max TQ: ${maxTQ.toFixed(1)}`,
-            showlegend: true,
-            hoverinfo: 'skip',
-            line: { color: gear_colors[0], shape: 'spline', width: 2 }
-          }
-        ];
-        const dynoLayout = {
-          title: 'HP and Torque',
-          xaxis: { title: 'RPM', color: 'white', autorange: false, range: [rpmArrRaw[0], rpmArrRaw[rpmArrRaw.length - 1] + 2000] },
-          yaxis: { title: 'HP / TQ', color: 'white', autorange: false, range: [0, dynoMaxHP] },
-          plot_bgcolor: '#111',
-          paper_bgcolor: '#111',
-          font: { color: 'white' },
-          transition: { duration: 1000, easing: 'cubic-in-out' },
-          hovermode: 'closest',
-          hoverdistance: 10
-        };
-        // Plot active dyno curves and summary first, then any frozen dyno sets (with blank spacer at the start)
-        const allDynoTraces = [
-          ...dynoTraces,
-          ...legendTraces,
-          ...frozenTraces
-        ];
-        if (animate) {
-          Plotly.react('plot', allDynoTraces, dynoLayout, {responsive: true});
-        } else {
-          const staticLayout = { ...dynoLayout };
-          delete staticLayout.transition;
-          Plotly.newPlot('plot', allDynoTraces, staticLayout, {responsive: true});
-        }
-        // FORCE A RESIZE IMMEDIATELY and AGAIN after a brief delay
-        const plotEl = document.getElementById('plot');
-        Plotly.Plots.resize(plotEl);
-        setTimeout(() => {
-          Plotly.Plots.resize(plotEl);
-        }, 100);
-        previousTraces = []; // clear previousTraces for dyno
-        return;  // skip wheel plotting
-      }
-
-      // --- Wheel TQ view as before ---
-      // Compute optimal shift RPM and speed for each gear (for legend labels)
-      const { wt, spd, shift_rpm, shift_speed } = computeShiftPoints(hpArr, fd, rpmArr);
-
-      const truncate = document.getElementById("truncateCross").checked;
-
-      // Legend entry for current sprocket set
-      const groupLabel = `(F${front}/R${rear} ${hpKey})`;
-      const traces = [];
-      traces.push({
-        x: [null], y: [null],
-        mode: 'lines',
-        name: groupLabel,
-        showlegend: true,
-        hoverinfo: 'skip',
-        line: {
-          color: gear_colors[0],
-          width: 2,
-          shape: 'spline'
-        }
-      });
-
-      const connectors = [];
-
+    else if (currentFamily === 'wheel') {
+      const { wt, shift_speed } = computeShiftPoints(hpArr, fd, rpmArr);
+      frozenTraces.push({ x:[null], y:[null], mode:'lines', name:`(F${front}/R${rear} ${hpKey})`, showlegend:true, hoverinfo:'skip', line:{ color: gear_colors[0], width: 2, dash: dashStyle, shape: 'spline' } });
+      
+      // Add gear traces (simplified version)
       for (let g = 1; g <= 6; g++) {
         const speeds = rpmArr.map(r => rpmToSpeed(r, gear_ratios[g], fd));
         const torques = hpToWheelTorqueAt(rpmArr, hpArr, gear_ratios[g], fd);
-        let xPts = [], yPts = [], rpmPts = [];
-
-        // Build point arrays, capturing RPM for hover
-        for (let i = 0; i < rpmArr.length; i++) {
-          const sp = speeds[i], tq = torques[i], rp = rpmArr[i];
-          // include all when not truncating, or only within bounds
-          const inRange = !truncate ||
-            ((g > 1 ? sp >= shift_speed[g-1] : true) &&
-             (g < 6 ? sp <= shift_speed[g]   : true));
-          if (inRange) {
-            xPts.push(sp);
-            yPts.push(tq);
-            rpmPts.push(rp);
-          }
-        }
-
-        if (xPts.length) {
-          // Build legend label with shift/redline info
-          let label = `Gear ${g}`;
-          if (g < 6 && shift_rpm[g] != null) {
-            // For gears 1-5, show optimal shift point
-            label += ` (${Math.round(shift_rpm[g])} RPM / ${shift_speed[g].toFixed(1)} MPH)`;
-          } else if (g === 6) {
-            // For 6th gear, show redline RPM and speed
-            const redlineRPM = rpmArr[rpmArr.length - 1];
-            const redlineSpeed = rpmToSpeed(redlineRPM, gear_ratios[g], fd);
-            label += ` (${Math.round(redlineRPM)} RPM / ${redlineSpeed.toFixed(1)} MPH)`;
-          }
-          traces.push({
-            x: xPts,
-            y: yPts,
-            customdata: rpmPts,
-            mode: 'lines',
-            name: label,
-            line: {
-              color: gear_colors[g-1],
-              width: 2,
-              shape: 'spline'
-            },
-            opacity: 1,
-            hovertemplate:
-              'Speed: %{x:.1f} MPH<br>' +
-              'RPM: %{customdata:.0f} RPM<br>' +
-              'Torque: %{y:.1f} lb-ft<extra></extra>'
-          });
-        }
+        let label = `Gear ${g}`;
+        if (g < 6 && shift_speed[g] != null) label += ` (${shift_speed[g].toFixed(1)} MPH)`;
+        frozenTraces.push({ x: speeds, y: torques, mode: 'lines', name: label, showlegend: true, hovertemplate: 'Speed: %{x:.1f} MPH<br>Torque: %{y:.1f} lb-ft<extra></extra>', line: { color: gear_colors[g-1], dash: dashStyle, width: 2, shape: 'spline', opacity: 0.3 } });
       }
-
-      // Build connector traces: vertical lines from label down to next gear torque
-      const connectorTraces = [];
+      
+      // Add shift point connectors
       for (let g = 1; g <= 5; g++) {
         const xShift = shift_speed[g];
         if (xShift != null) {
-          // Compute label position
-          const baseRatio = 0.97, stepRatio = 0.03;
-          const yLabel = Math.max(0, baseRatio - freezeCount * stepRatio) * maxY;
-          // Find the first torque value of the next gear at or beyond xShift
+          const yLabel = Math.max(0, (0.97 - configIndex * 0.03)) * maxY;
           const speedsNext = rpmArr.map(r => rpmToSpeed(r, gear_ratios[g + 1], fd));
           const idxNext = speedsNext.findIndex(s => s >= xShift);
           const torqueNext = idxNext !== -1 ? wt[g + 1][idxNext] : 0;
-          // Draw vertical line from label down to the next gear's start torque
-          connectorTraces.push({
-            x: [xShift, xShift],
-            y: [yLabel, torqueNext],
-            mode: 'lines',
-            line: {
-              color: gear_colors[g - 1],
-              width: 2,
-              dash: activeDash || 'solid'
-            },
-            showlegend: false,
-            hoverinfo: 'skip'
+          frozenConnectorTraces.push({
+            x: [xShift, xShift], y: [yLabel, torqueNext], mode: 'lines',
+            line: { color: gear_colors[g - 1], width: 1, dash: dashStyle },
+            showlegend: false, hoverinfo: 'skip'
           });
-          // Place speed label at the top of the line
-          connectorTraces.push({
-            x: [xShift],
-            y: [yLabel],
-            mode: 'text',
-            text: [`${xShift.toFixed(1)} MPH`],
-            textposition: 'top center',
-            textfont: { color: gear_colors[g - 1] },
-            showlegend: false,
-            hoverinfo: 'skip',
-            cliponaxis: false
+          frozenConnectorTraces.push({
+            x: [xShift], y: [yLabel], mode: 'text', text: [`${xShift.toFixed(1)} MPH`],
+            textposition: 'top center', textfont: { color: gear_colors[g - 1] },
+            showlegend: false, hoverinfo: 'skip', cliponaxis: false
           });
         }
       }
+    }
+  });
+}
+function toggleControlVisibility() {
+  const view = document.getElementById('viewSelect').value;
+  const accel = view.startsWith('accel');
+  ['weightLbLabel','weightLb','shiftMsLabel','shiftMs'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = accel ? 'inline-block' : 'none';
+  });
+  const clipEl = document.getElementById('clipControl');
+  if (clipEl) clipEl.style.display = (view === 'wheel') ? 'inline-block' : 'none';
+}
 
-      const layout = {
-        transition: { duration: 1000, easing: 'cubic-in-out' },
-        hovermode: 'closest',
-        hoverdistance: 10,
-        title: 'Wheel Torque / Shift Points',
-        xaxis: {title:'Speed (MPH)', color:'white', range:[0,maxX]},
-        yaxis: {title:'Wheel Torque (lb-ft)', color:'white', range:[0,maxY]},
-        plot_bgcolor:'#111', paper_bgcolor:'#111', font:{color:'white'}
-      };
+// Shift points calc
+function computeShiftPoints(hpArr, final_drive, rpmArr) {
+  const wt = {}, spd = {};
+  for (let g = 1; g <= 6; g++) {
+    wt[g]  = hpToWheelTorqueAt(rpmArr, hpArr, gear_ratios[g], final_drive);
+    spd[g] = rpmArr.map(rpm => rpmToSpeed(rpm, gear_ratios[g], final_drive));
+  }
+  const shift_rpm = {}, shift_speed = {};
+  for (let g = 1; g <= 5; g++) {
+    const ratio  = gear_ratios[g + 1] / gear_ratios[g];
+    const diff   = [];
+    for (let i = 0; i < rpmArr.length; i++) {
+      const rp    = rpmArr[i];
+      const curTq = wt[g][i];
+      const nxtTq = interp1(rpmArr, wt[g + 1], rp * ratio);
+      diff.push(nxtTq - curTq);
+    }
+    let idx = diff.findIndex(d => d >= 0);
+    let shiftRPM;
+    if (idx === -1) shiftRPM = rpmArr[rpmArr.length - 1];
+    else if (idx === 0) shiftRPM = rpmArr[0];
+    else shiftRPM = lerp(rpmArr[idx - 1], diff[idx - 1], rpmArr[idx], diff[idx], 0);
+    shift_rpm[g]   = shiftRPM;
+    shift_speed[g] = rpmToSpeed(shiftRPM, gear_ratios[g], final_drive);
+  }
+  return { wt, spd, shift_rpm, shift_speed };
+}
 
-      const allTraces = [...traces, ...connectorTraces, ...frozenTraces, ...frozenConnectorTraces];
-      if (animate) {
-        Plotly.react('plot', allTraces, layout, {responsive: true});
-      } else {
-        // Render without transition animation
-        const staticLayout = { ...layout };
-        delete staticLayout.transition;
-        Plotly.newPlot('plot', allTraces, staticLayout, {responsive: true});
+// Accel sim with trapezoidal distance and shift time
+function simulateAccel(hpArr, rpmArr, final_drive, dt = 0.02, mass_lb_param = getMassLb(), shift_ms = getShiftMs()) {
+  function wheelTorqueAtSpeed(speed_mps, gear) {
+    const speed_mph = speed_mps * MPS_TO_MPH;
+    const rpm = Math.max(rpmArr[0], Math.min(rpmArr[rpmArr.length - 1], speedToRpm(speed_mph, gear_ratios[gear], final_drive)));
+    const hp = interp1(rpmArr, hpArr, rpm);
+    const tq_lbft = (hp * 5252) / rpm;
+    const overall = primary_drive * gear_ratios[gear] * final_drive;
+    const tq_wheel_Nm = tq_lbft * overall * LBF_FT_TO_NM;
+    return tq_wheel_Nm / wheel_radius_m;
+  }
+
+  const mass_kg = mass_lb_param * LB_TO_KG;
+  const max_rpm = rpmArr[rpmArr.length - 1];
+  const { shift_speed } = computeShiftPoints(hpArr, final_drive, rpmArr);
+
+  let g = 1, t = 0, v = 0, s = 0;
+  let shiftCooldown = 0, pendingGear = null;
+  const cooldownSteps = Math.max(0, Math.round((shift_ms / 1000) / dt));
+
+  const T = [0], V = [0], A = [0], S = [0], G = [g], shiftMarkers = [];
+
+  for (let step = 0; step < 20000; step++) {
+    if (shiftCooldown === 0 && pendingGear === null && g <= 5) {
+      const v_shift_mph = shift_speed[g];
+      if (v_shift_mph !== undefined && v * MPS_TO_MPH >= v_shift_mph) {
+        shiftMarkers.push({ t, v_mph: v * MPS_TO_MPH, gear: g });
+        pendingGear = g + 1;
+        shiftCooldown = cooldownSteps;
       }
-      previousTraces = [...traces, ...connectorTraces];
-      // Force a resize/redraw to ensure plot updates correctly
-      Plotly.Plots.resize(document.getElementById('plot'));
     }
 
-    // Initialize
-    populateHpDropdown();
-    getPlotBounds();
-    plotTorque();
+    let F_trac;
+    if (shiftCooldown > 0) {
+      F_trac = 0;
+      shiftCooldown -= 1;
+      if (shiftCooldown === 0 && pendingGear !== null) {
+        g = pendingGear;
+        pendingGear = null;
+      }
+    } else {
+      F_trac = wheelTorqueAtSpeed(v, g);
+    }
 
-    // Redraw on window resize to fit new dimensions
-    window.addEventListener('resize', () => {
-      plotTorque(false);  // redraw without animation
-    });
-  </script>
+    const rpm_now = speedToRpm(v * MPS_TO_MPH, gear_ratios[g], final_drive);
+    if (g === 6 && rpm_now >= max_rpm) break;
+
+    const F_roll = Crr * mass_kg * g_mps2;
+    const F_aero = 0.5 * rho_air * CdA * v * v;
+    const F_net = Math.max(0, F_trac - F_roll - F_aero);
+    const a = F_net / mass_kg;
+
+    // Trapezoid integration for distance over this step
+    s += v * dt + 0.5 * a * dt * dt;
+    v += a * dt;
+    t += dt;
+
+    T.push(t);
+    V.push(v * MPS_TO_MPH);
+    A.push(a);
+    S.push(s * M_TO_FT);
+    G.push(g);
+
+    if (a < 0.05 && v > 60 * MPH_TO_MPS) {
+      if (T.length > 200 && Math.abs(V[V.length - 1] - V[V.length - 200]) < 0.5) break;
+    }
+  }
+  return { T, V, A, S, G, shiftMarkers };
+}
+
+// Precompute dyno y max
+const dynoMaxHP = (() => {
+  let maxVal = 0;
+  Object.values(hp_data_sets).forEach(arr => arr.forEach(([rpm, v]) => { if (v > maxVal) maxVal = v; }));
+  return Math.ceil(maxVal / 10) * 10;
+})();
+
+function populateHpDropdown() {
+  const sel = document.getElementById('hpData');
+  sel.innerHTML = '';
+  const keys = Object.keys(hp_data_sets);
+  keys.forEach(k => {
+    const opt = document.createElement('option');
+    opt.value = k; opt.textContent = k; sel.appendChild(opt);
+  });
+  if (keys.includes('Stock')) sel.value = 'Stock'; else if (keys.length) sel.value = keys[0];
+}
+
+function getPlotBounds() {
+  const all_hp = Object.values(hp_data_sets);
+  const fd_ratios = [48/13, 48/14, 50/13, 50/14];
+  for (const gr of Object.values(gear_ratios)) {
+    for (const hpArr of all_hp) {
+      const rpmArrRaw = hpArr.map(([r, hp]) => r);
+      const hpArrRaw = hpArr.map(([r, hp]) => hp);
+      for (const fd of fd_ratios) {
+        for (let i = 0; i < rpmArrRaw.length; i++) {
+          const rpm = rpmArrRaw[i], hp = hpArrRaw[i];
+          const speed = rpmToSpeed(rpm, gr, fd);
+          const tq    = (hp * 5252 / rpm) * (primary_drive * gr * fd);
+          if (speed > maxX) maxX = speed;
+          if (tq    > maxY) maxY = tq;
+        }
+      }
+    }
+  }
+  maxY = Math.ceil(maxY / 100) * 100;
+}
+
+function freezeCurrentTraces() {
+  // Store current configuration instead of generating traces
+  const front = parseInt(document.getElementById('front').value);
+  const rear = parseInt(document.getElementById('rear').value);
+  const hpKey = document.getElementById('hpData').value;
+  const weightLb = getMassLb();
+  const shiftMs = getShiftMs();
+  
+  // Add configuration to frozen configurations array
+  frozenConfigurations.push({ front, rear, hpKey, weightLb, shiftMs });
+  freezeCount++;
+  
+  // Regenerate all frozen traces for current view
+  regenerateFrozenTraces();
+  
+  const notif = document.getElementById('freezeNotification');
+  notif.style.display = 'block'; setTimeout(()=>{ notif.style.display='none'; }, 2000);
+  plotTorque(false);
+}
+function clearFrozenTraces() {
+  document.getElementById("front").value = "14";
+  document.getElementById("rear").value = "48";
+  document.getElementById("hpData").value = "Stock";
+  document.getElementById("truncateCross").checked = false;
+  frozenConfigurations = []; frozenTraces = []; freezeCount = 0; frozenConnectorTraces = [];
+  plotTorque();
+}
+
+function plotTorque(animate = true) {
+  const view = document.getElementById('viewSelect').value;
+  const fam = viewFamily(view);
+  toggleControlVisibility();
+
+  // Remember the last view for comparison
+  const lastView = window.lastPlotView;
+  window.lastPlotView = view;
+  
+  // Regenerate frozen traces when view changes (only if we have configurations)
+  if ((lastFamily !== null && fam !== lastFamily) || (lastView && lastView !== view)) {
+    if (frozenConfigurations.length > 0) {
+      regenerateFrozenTraces();
+    }
+  }
+  lastFamily = fam;
+  
+  // Also regenerate if we have configurations but no traces (initial load)
+  if (frozenConfigurations.length > 0 && frozenTraces.length === 0) {
+    regenerateFrozenTraces();
+  }
+
+  const front = parseInt(document.getElementById("front").value);
+  const rear  = parseInt(document.getElementById("rear").value);
+  const hpKey = document.getElementById("hpData").value;
+  const rpmArr = rpmDense;
+  const hpArr  = hpDenseSets[hpKey];
+  const fd = rear / front;
+  const activeDash = (freezeCount > 1 && animate) ? freezeDashStyles[(freezeCount - 1) % freezeDashStyles.length] : null;
+
+  if (view === 'dyno') {
+    const hpArrRaw = hp_data_sets[hpKey].map(([r, hp]) => hp);
+    const rpmArrRaw = hp_data_sets[hpKey].map(([r, hp]) => r);
+    const engTq = hp_data_sets[hpKey].map(([rpm, hp]) => (hp * 5252) / rpm);
+    const dynoTraces = [
+      { x: rpmArrRaw, y: engTq, mode:'lines', showlegend:false, hoverinfo:'x+y', hovertemplate:'RPM: %{x} RPM<br>Torque: %{y:.1f} lb-ft<extra></extra>', line:{ color: gear_colors[0], shape:'spline', width:2 } },
+      { x: rpmArrRaw, y: hpArrRaw, mode:'lines', showlegend:false, hoverinfo:'x+y', hovertemplate:'RPM: %{x} RPM<br>HP: %{y:.1f}<extra></extra>', line:{ color: gear_colors[1], shape:'spline', width:2 } }
+    ];
+    const maxHP = Math.max(...hpArrRaw), maxTQ = Math.max(...engTq);
+    const legendTraces = [
+      { x:[null], y:[null], mode:'lines', name:hpKey, showlegend:true, hoverinfo:'skip', line:{ color:'rgba(0,0,0,0)', width:0 } },
+      { x:[null], y:[null], mode:'lines', name:`Max HP: ${maxHP.toFixed(1)}`, showlegend:true, hoverinfo:'skip', line:{ color:gear_colors[1], shape:'spline', width:2 } },
+      { x:[null], y:[null], mode:'lines', name:`Max TQ: ${maxTQ.toFixed(1)}`, showlegend:true, hoverinfo:'skip', line:{ color:gear_colors[0], shape:'spline', width:2 } }
+    ];
+    const dynoLayout = { title:'HP and Torque', xaxis:{ title:'RPM', color:'white', autorange:false, range:[rpmArrRaw[0], rpmArrRaw[rpmArrRaw.length-1] + 2000] }, yaxis:{ title:'HP / TQ', color:'white', autorange:false, range:[0, dynoMaxHP] }, plot_bgcolor:'#111', paper_bgcolor:'#111', font:{ color:'white' }, transition:{ duration:1000, easing:'cubic-in-out' }, hovermode:'closest', hoverdistance:10 };
+    const allDynoTraces = [...dynoTraces, ...legendTraces, ...frozenTraces];
+    if (animate) Plotly.react('plot', allDynoTraces, dynoLayout, {responsive:true});
+    else { const staticLayout = { ...dynoLayout }; delete staticLayout.transition; Plotly.newPlot('plot', allDynoTraces, staticLayout, {responsive:true}); }
+    Plotly.Plots.resize(document.getElementById('plot'));
+    previousTraces = []; return;
+  }
+
+  if (fam === 'accel') {
+    const sim = simulateAccel(hpArr, rpmArr, fd, 0.02);
+    let xData, yData, xTitle, yTitle, lockX=false, lockY=false, showShift=false;
+    if (view === 'accel_ts') { xData = sim.T; yData = sim.V; xTitle='Time (s)'; yTitle='Speed (MPH)'; lockX=true; lockY=true; showShift=true; }
+    else if (view === 'accel_td') { xData = sim.T; yData = sim.S; xTitle='Time (s)'; yTitle='Distance (ft)'; }
+    else if (view === 'accel_tg') { xData = sim.T; yData = sim.A.map(a=>a/g_mps2); xTitle='Time (s)'; yTitle='Acceleration (g)'; }
+    else if (view === 'accel_sg') { xData = sim.V; yData = sim.A.map(a=>a/g_mps2); xTitle='Speed (MPH)'; yTitle='Acceleration (g)'; }
+    else { xData = sim.T; yData = sim.V; xTitle='Time (s)'; yTitle='Speed (MPH)'; }
+
+    const traces = [];
+    const currentColor = gear_colors[freezeCount % gear_colors.length];
+    traces.push({ x:[null], y:[null], mode:'lines', name:`(F${front}/R${rear} ${hpKey})`, showlegend:true, hoverinfo:'skip', line:{ color: currentColor, width:2, shape:'spline' } });
+    traces.push({ x:xData, y:yData, mode:'lines', name:'Acceleration View', showlegend:false, hoverinfo:'x+y',
+      hovertemplate: (xTitle.startsWith('Time') ? `Time: %{x:.2f}s` : `Speed: %{x:.1f} mph`) + '<br>' +
+        (yTitle.includes('MPH') ? `Speed: %{y:.1f} mph` : yTitle.includes('ft') ? `Distance: %{y:.0f} ft` : `Accel: %{y:.2f} g`) +
+        '<extra></extra>',
+      line:{ color: currentColor, width:2, shape:'spline' } });
+
+    const connectorTraces = [];
+    if (showShift) {
+      sim.shiftMarkers.forEach(m => {
+        const yLabelPos = Math.max(0, (ACCEL_LABEL_BASE - freezeCount * ACCEL_LABEL_STEP) * ACCEL_SPEED_YMAX);
+        const shiftColor = gear_colors[Math.max(0, m.gear-1)];
+        connectorTraces.push({ x:[m.t, m.t], y:[yLabelPos, m.v_mph], mode:'lines', line:{ color: shiftColor, width:2 }, showlegend:false, hoverinfo:'skip' });
+        connectorTraces.push({ x:[m.t], y:[yLabelPos], mode:'text', text:[`${m.t.toFixed(2)} s`], textposition:'top center', textfont:{ color: shiftColor }, showlegend:false, hoverinfo:'skip', cliponaxis:false });
+      });
+    }
+
+    const layout = {
+      title: 'Acceleration',
+      xaxis: lockX ? { title:xTitle, color:'white', range:[0,30] } : { title:xTitle, color:'white' },
+      yaxis: lockY ? { title:yTitle, color:'white', range:[0,150] } : { title:yTitle, color:'white' },
+      plot_bgcolor:'#111', paper_bgcolor:'#111', font:{ color:'white' },
+      hovermode:'closest', hoverdistance:10, transition:{ duration:1000, easing:'cubic-in-out' }
+    };
+
+    const allTraces = [...traces, ...connectorTraces, ...frozenTraces, ...frozenConnectorTraces];
+    if (animate) Plotly.react('plot', allTraces, layout, { responsive:true });
+    else { const staticLayout = { ...layout }; delete staticLayout.transition; Plotly.newPlot('plot', allTraces, staticLayout, { responsive:true }); }
+    previousTraces = [...traces, ...connectorTraces];
+    Plotly.Plots.resize(document.getElementById('plot'));
+    return;
+  }
+
+  // Wheel TQ
+  const { wt, spd, shift_rpm, shift_speed } = computeShiftPoints(hpArr, fd, rpmArr);
+  const truncate = document.getElementById("truncateCross").checked;
+  const traces = [];
+  const groupLabel = `(F${front}/R${rear} ${hpKey})`;
+  traces.push({ x:[null], y:[null], mode:'lines', name:groupLabel, showlegend:true, hoverinfo:'skip', line:{ color: gear_colors[0], width:2, shape:'spline' } });
+
+  for (let g = 1; g <= 6; g++) {
+    const speeds = rpmArr.map(r => rpmToSpeed(r, gear_ratios[g], fd));
+    const torques = hpToWheelTorqueAt(rpmArr, hpArr, gear_ratios[g], fd);
+    let xPts = [], yPts = [], rpmPts = [];
+    for (let i = 0; i < rpmArr.length; i++) {
+      const sp = speeds[i], tq = torques[i], rp = rpmArr[i];
+      const inRange = !truncate || ((g > 1 ? sp >= shift_speed[g-1] : true) && (g < 6 ? sp <= shift_speed[g] : true));
+      if (inRange) { xPts.push(sp); yPts.push(tq); rpmPts.push(rp); }
+    }
+    if (xPts.length) {
+      let label = `Gear ${g}`;
+      if (g < 6 && shift_rpm[g] != null) label += ` (${Math.round(shift_rpm[g])} RPM / ${shift_speed[g].toFixed(1)} MPH)`;
+      else if (g === 6) { const red = rpmArr[rpmArr.length - 1]; const sp = rpmToSpeed(red, gear_ratios[g], fd); label += ` (${Math.round(red)} RPM / ${sp.toFixed(1)} MPH)`; }
+      traces.push({ x:xPts, y:yPts, customdata:rpmPts, mode:'lines', name:label, line:{ color:gear_colors[g-1], width:2, shape:'spline' }, opacity:1, hovertemplate:'Speed: %{x:.1f} MPH<br>RPM: %{customdata:.0f} RPM<br>Torque: %{y:.1f} lb-ft<extra></extra>' });
+    }
+  }
+
+  const connectorTraces = [];
+  for (let g = 1; g <= 5; g++) {
+    const xShift = shift_speed[g];
+    if (xShift != null) {
+      const baseRatio = 0.97, stepRatio = 0.03;
+      const yLabel = Math.max(0, baseRatio - freezeCount * stepRatio) * maxY;
+      const speedsNext = rpmArr.map(r => rpmToSpeed(r, gear_ratios[g + 1], fd));
+      const idxNext = speedsNext.findIndex(s => s >= xShift);
+      const torqueNext = idxNext !== -1 ? wt[g + 1][idxNext] : 0;
+      connectorTraces.push({ x:[xShift, xShift], y:[yLabel, torqueNext], mode:'lines', line:{ color:gear_colors[g - 1], width:2, dash: activeDash || 'solid' }, showlegend:false, hoverinfo:'skip' });
+      connectorTraces.push({ x:[xShift], y:[yLabel], mode:'text', text:[`${xShift.toFixed(1)} MPH`], textposition:'top center', textfont:{ color:gear_colors[g - 1] }, showlegend:false, hoverinfo:'skip', cliponaxis:false });
+    }
+  }
+
+  const layout = { transition:{ duration:1000, easing:'cubic-in-out' }, hovermode:'closest', hoverdistance:10, title:'Wheel Torque / Shift Points', xaxis:{title:'Speed (MPH)', color:'white', range:[0,maxX]}, yaxis:{title:'Wheel Torque (lb-ft)', color:'white', range:[0,maxY]}, plot_bgcolor:'#111', paper_bgcolor:'#111', font:{color:'white'} };
+  const allTraces = [...traces, ...connectorTraces, ...frozenTraces, ...frozenConnectorTraces];
+  if (animate) Plotly.react('plot', allTraces, layout, {responsive: true});
+  else { const staticLayout = { ...layout }; delete staticLayout.transition; Plotly.newPlot('plot', allTraces, staticLayout, {responsive: true}); }
+  previousTraces = [...traces, ...connectorTraces];
+  Plotly.Plots.resize(document.getElementById('plot'));
+}
+
+function init() { populateHpDropdown(); getPlotBounds(); plotTorque(); toggleControlVisibility(); }
+document.addEventListener('DOMContentLoaded', init);
+window.addEventListener('resize', () => plotTorque(false));
+</script>
 </body>
 </html>
