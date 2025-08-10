@@ -238,8 +238,10 @@ function regenerateFrozenTraces() {
       if (showShift) {
         sim.shiftMarkers.forEach(m => {
           const yLabelPos = Math.max(0, (ACCEL_LABEL_BASE - configIndex * ACCEL_LABEL_STEP) * ACCEL_SPEED_YMAX);
-          frozenConnectorTraces.push({ x:[m.t, m.t], y:[yLabelPos, m.v_mph], mode:'lines', line:{ color: gear_colors[m.gear-1], width:1 }, showlegend:false, hoverinfo:'skip', yaxis:'y' });
-          frozenConnectorTraces.push({ x:[m.t], y:[yLabelPos], mode:'text', text:[`${m.t.toFixed(2)} s`], textposition:'top center', textfont:{ color: gear_colors[m.gear-1] }, showlegend:false, hoverinfo:'skip', cliponaxis:false });
+          // ---- Vertical lines disabled for frozen traces ----
+          //frozenConnectorTraces.push({ x:[m.t, m.t], y:[yLabelPos, m.v_mph], mode:'lines', line:{ color: gear_colors[m.gear-1], width:1 }, showlegend:false, hoverinfo:'skip', yaxis:'y' });
+          //frozenConnectorTraces.push({ x:[m.t], y:[yLabelPos], mode:'text', text:[`${m.t.toFixed(2)} s`], textposition:'top center', textfont:{ color: gear_colors[m.gear-1] }, showlegend:false, hoverinfo:'skip', cliponaxis:false });
+          // ---------------------------------------------------
         });
       }
     }
@@ -454,7 +456,7 @@ function freezeCurrentTraces() {
   
   const notif = document.getElementById('freezeNotification');
   notif.style.display = 'block'; setTimeout(()=>{ notif.style.display='none'; }, 2000);
-  plotTorque(false);
+  plotTorque(false); // <--- This line redraws the plot after freezing traces
 }
 function clearFrozenTraces() {
   document.getElementById("front").value = "14";
@@ -546,8 +548,10 @@ function plotTorque(animate = true) {
       sim.shiftMarkers.forEach(m => {
         const yLabelPos = Math.max(0, (ACCEL_LABEL_BASE - freezeCount * ACCEL_LABEL_STEP) * ACCEL_SPEED_YMAX);
         const shiftColor = gear_colors[Math.max(0, m.gear-1)];
-        connectorTraces.push({ x:[m.t, m.t], y:[yLabelPos, m.v_mph], mode:'lines', line:{ color: shiftColor, width:2 }, showlegend:false, hoverinfo:'skip' });
-        connectorTraces.push({ x:[m.t], y:[yLabelPos], mode:'text', text:[`${m.t.toFixed(2)} s`], textposition:'top center', textfont:{ color: shiftColor }, showlegend:false, hoverinfo:'skip', cliponaxis:false });
+        // ---- These two lines draw the vertical lines and labels ----
+        //connectorTraces.push({ x:[m.t, m.t], y:[yLabelPos, m.v_mph], mode:'lines', line:{ color: shiftColor, width:2 }, showlegend:false, hoverinfo:'skip' });
+        //connectorTraces.push({ x:[m.t], y:[yLabelPos], mode:'text', text:[`${m.t.toFixed(2)} s`], textposition:'top center', textfont:{ color: shiftColor }, showlegend:false, hoverinfo:'skip', cliponaxis:false });
+        // -----------------------------------------------------------
       });
     }
 
