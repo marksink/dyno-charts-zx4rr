@@ -244,7 +244,7 @@ function regenerateFrozenTraces() {
       }
     }
     else if (currentFamily === 'wheel') {
-      const { wt, shift_speed } = computeShiftPoints(hpArr, fd, rpmArr);
+      const { wt, shift_speed, shift_rpm } = computeShiftPoints(hpArr, fd, rpmArr);
       const truncate = document.getElementById("truncateCross").checked;
       frozenTraces.push({ x:[null], y:[null], mode:'lines', name:`(F${front}/R${rear} ${hpKey})`, showlegend:true, hoverinfo:'skip', line:{ color: gear_colors[0], width: 2, dash: dashStyle, shape: 'spline' } });
       
@@ -260,7 +260,8 @@ function regenerateFrozenTraces() {
         }
         if (xPts.length) {
           let label = `Gear ${g}`;
-          if (g < 6 && shift_speed[g] != null) label += ` (${shift_speed[g].toFixed(1)} MPH)`;
+          if (g < 6 && shift_rpm[g] != null) label += ` (${Math.round(shift_rpm[g])} RPM / ${shift_speed[g].toFixed(1)} MPH)`;
+          else if (g === 6) { const red = rpmArr[rpmArr.length - 1]; const sp = rpmToSpeed(red, gear_ratios[g], fd); label += ` (${Math.round(red)} RPM / ${sp.toFixed(1)} MPH)`; }
           frozenTraces.push({ x: xPts, y: yPts, mode: 'lines', name: label, showlegend: true, hovertemplate: 'Speed: %{x:.1f} MPH<br>Torque: %{y:.1f} lb-ft<extra></extra>', line: { color: gear_colors[g-1], dash: dashStyle, width: 2, shape: 'spline', opacity: 0.3 } });
         }
       }
