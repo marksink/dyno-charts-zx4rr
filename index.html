@@ -245,15 +245,24 @@ function regenerateFrozenTraces() {
     }
     else if (currentFamily === 'wheel') {
       const { wt, shift_speed } = computeShiftPoints(hpArr, fd, rpmArr);
+      const truncate = document.getElementById("truncateCross").checked;
       frozenTraces.push({ x:[null], y:[null], mode:'lines', name:`(F${front}/R${rear} ${hpKey})`, showlegend:true, hoverinfo:'skip', line:{ color: gear_colors[0], width: 2, dash: dashStyle, shape: 'spline' } });
       
-      // Add gear traces (simplified version)
+      // Add gear traces (applying clip lines setting)
       for (let g = 1; g <= 6; g++) {
         const speeds = rpmArr.map(r => rpmToSpeed(r, gear_ratios[g], fd));
         const torques = hpToWheelTorqueAt(rpmArr, hpArr, gear_ratios[g], fd);
-        let label = `Gear ${g}`;
-        if (g < 6 && shift_speed[g] != null) label += ` (${shift_speed[g].toFixed(1)} MPH)`;
-        frozenTraces.push({ x: speeds, y: torques, mode: 'lines', name: label, showlegend: true, hovertemplate: 'Speed: %{x:.1f} MPH<br>Torque: %{y:.1f} lb-ft<extra></extra>', line: { color: gear_colors[g-1], dash: dashStyle, width: 2, shape: 'spline', opacity: 0.3 } });
+        let xPts = [], yPts = [];
+        for (let i = 0; i < rpmArr.length; i++) {
+          const sp = speeds[i], tq = torques[i];
+          const inRange = !truncate || ((g > 1 ? sp >= shift_speed[g-1] : true) && (g < 6 ? sp <= shift_speed[g] : true));
+          if (inRange) { xPts.push(sp); yPts.push(tq); }
+        }
+        if (xPts.length) {
+          let label = `Gear ${g}`;
+          if (g < 6 && shift_speed[g] != null) label += ` (${shift_speed[g].toFixed(1)} MPH)`;
+          frozenTraces.push({ x: xPts, y: yPts, mode: 'lines', name: label, showlegend: true, hovertemplate: 'Speed: %{x:.1f} MPH<br>Torque: %{y:.1f} lb-ft<extra></extra>', line: { color: gear_colors[g-1], dash: dashStyle, width: 2, shape: 'spline', opacity: 0.3 } });
+        }
       }
       
       // Add shift point connectors
@@ -474,6 +483,11 @@ function plotTorque(animate = true) {
   
   // Also regenerate if we have configurations but no traces (initial load)
   if (frozenConfigurations.length > 0 && frozenTraces.length === 0) {
+    regenerateFrozenTraces();
+  }
+  
+  // Always regenerate frozen traces if we have configurations (to respect current settings)
+  if (frozenConfigurations.length > 0) {
     regenerateFrozenTraces();
   }
 
