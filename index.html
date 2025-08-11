@@ -5,65 +5,267 @@
   <title>ZX-4RR Dyno App</title>
   <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
   <style>
-    body { background-color: #111; color: white; font-family: Arial, sans-serif; }
-    #plot { width: 90%; max-width: calc(100vh * (16 / 9)); aspect-ratio: 16 / 9; max-height: 90vh; margin: auto; }
-    .controls { text-align: center; margin-bottom: 20px; }
-    .controls > * { margin: 0 6px; }
-    button { margin-left: 10px; }
-    label { user-select: none; }
+    body { 
+      background: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%); 
+      color: #e8e8e8; 
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+      margin: 0; 
+      padding: 10px;
+      min-height: 100vh;
+      box-sizing: border-box;
+      overflow-x: hidden;
+    }
+    
+    h1 {
+      text-align: center;
+      color: #ffffff;
+      font-weight: 300;
+      font-size: 2.2em;
+      margin: 10px 0 20px 0;
+      text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+    }
+    
+    #plot { 
+      width: 98%; 
+      max-width: calc(100vh - 200px); 
+      aspect-ratio: 16 / 9; 
+      max-height: calc(100vh - 200px); 
+      margin: auto;
+      border-radius: 12px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    }
+    
+    .controls { 
+      display: flex;
+      flex-wrap: nowrap;
+      justify-content: center;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 15px;
+      padding: 12px 8px;
+      background: rgba(255,255,255,0.05);
+      border-radius: 12px;
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255,255,255,0.1);
+      width: calc(100% - 20px);
+      margin: 0 auto 15px auto;
+      overflow-x: auto;
+      min-width: 0;
+    }
+    
+    .button-row {
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    
+    label { 
+      user-select: none;
+      font-weight: 500;
+      color: #d0d0d0;
+      font-size: 12px;
+      white-space: nowrap;
+      margin-right: 4px;
+    }
+    
+    select, input[type="number"] {
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.2);
+      color: #e8e8e8;
+      padding: 6px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      min-width: 60px;
+      width: auto;
+      transition: all 0.3s ease;
+    }
+    
+    select:hover, input[type="number"]:hover {
+      background: rgba(255,255,255,0.12);
+      border-color: rgba(255,255,255,0.3);
+    }
+    
+    select:focus, input[type="number"]:focus {
+      outline: none;
+      background: rgba(255,255,255,0.15);
+      border-color: #4a9eff;
+      box-shadow: 0 0 0 2px rgba(74,158,255,0.2);
+    }
+    
+    select option {
+      background: #2a2a2a;
+      color: #e8e8e8;
+    }
+    
+    button {
+      background: linear-gradient(145deg, #4a9eff 0%, #357abd 100%);
+      border: none;
+      color: white;
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      box-shadow: 0 3px 8px rgba(74,158,255,0.3);
+      min-width: 70px;
+    }
+    
+    button:hover {
+      background: linear-gradient(145deg, #5ba3ff 0%, #3d82c7 100%);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(74,158,255,0.4);
+    }
+    
+    button:active {
+      transform: translateY(0);
+      box-shadow: 0 2px 6px rgba(74,158,255,0.3);
+    }
+    
+    input[type="checkbox"] {
+      margin-right: 4px;
+      accent-color: #4a9eff;
+      transform: scale(1.1);
+    }
+    
+    .control-group {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      flex-shrink: 0;
+      white-space: nowrap;
+    }
+    
+    @media (max-width: 1400px) {
+      .controls {
+        gap: 6px;
+        padding: 10px 6px;
+      }
+      
+      label {
+        font-size: 11px;
+      }
+      
+      select, input[type="number"] {
+        font-size: 11px;
+        padding: 5px 6px;
+        min-width: 50px;
+      }
+    }
+    
+    @media (max-width: 1200px) {
+      .controls {
+        gap: 4px;
+        padding: 8px 4px;
+      }
+      
+      label {
+        font-size: 10px;
+      }
+      
+      select, input[type="number"] {
+        font-size: 10px;
+        padding: 4px 5px;
+        min-width: 45px;
+      }
+      
+      .control-group {
+        gap: 3px;
+      }
+    }
+    
+    @media (max-width: 768px) {
+      .controls {
+        flex-wrap: wrap;
+        gap: 8px;
+        padding: 12px;
+      }
+      
+      .control-group {
+        flex-shrink: 1;
+      }
+      
+      h1 {
+        font-size: 1.8em;
+      }
+      
+      #plot {
+        max-height: calc(100vh - 250px);
+      }
+    }
   </style>
 </head>
 <body>
   <h1 style="text-align:center;">Kawasaki ZX-4R</h1>
   <div class="controls">
-    <label for="front">Front Sprocket:</label>
-    <select id="front" onchange="plotTorque(true)">
-      <option value="12">12</option>
-      <option value="13">13</option>
-      <option value="14" selected>14</option>
-      <option value="15">15</option>
-    </select>
+    <div class="control-group">
+      <label for="front">F-Sprocket:</label>
+      <select id="front" onchange="plotTorque(true)">
+        <option value="12">12</option>
+        <option value="13">13</option>
+        <option value="14" selected>14</option>
+        <option value="15">15</option>
+      </select>
+    </div>
 
-    <label for="rear">Rear Sprocket:</label>
-    <select id="rear" onchange="plotTorque(true)">
-      <option value="43">43</option>
-      <option value="44">44</option>
-      <option value="45">45</option>
-      <option value="46">46</option>
-      <option value="47">47</option>
-      <option value="48" selected>48</option>
-      <option value="49">49</option>
-      <option value="50">50</option>
-      <option value="51">51</option>
-      <option value="52">52</option>
-      <option value="53">53</option>
-    </select>
+    <div class="control-group">
+      <label for="rear">R-Sprocket:</label>
+      <select id="rear" onchange="plotTorque(true)">
+        <option value="43">43</option>
+        <option value="44">44</option>
+        <option value="45">45</option>
+        <option value="46">46</option>
+        <option value="47">47</option>
+        <option value="48" selected>48</option>
+        <option value="49">49</option>
+        <option value="50">50</option>
+        <option value="51">51</option>
+        <option value="52">52</option>
+        <option value="53">53</option>
+      </select>
+    </div>
 
-    <label for="hpData">ECU Tune:</label>
-    <select id="hpData" onchange="plotTorque(true)"></select>
+    <div class="control-group">
+      <label for="hpData">ECU Tune:</label>
+      <select id="hpData" onchange="plotTorque(true)"></select>
+    </div>
 
-    <label for="viewSelect">View:</label>
-    <select id="viewSelect" onchange="plotTorque(true)">
-      <option value="wheel" selected>Wheel Torque</option>
-      <option value="dyno">Power Curves</option>
-      <option value="accel_ts">Time vs Speed</option>
-      <option value="accel_td">Time vs Distance</option>
-      <option value="accel_tg">Time vs G</option>
-      <option value="accel_sg">Speed vs G</option>
-    </select>
+    <div class="control-group">
+      <label for="shiftRpmSelect">Shift RPM:</label>
+      <select id="shiftRpmSelect" onchange="plotTorque(true)"></select>
+    </div>
+
+    <div class="control-group">
+      <label for="viewSelect">Plot:</label>
+      <select id="viewSelect" onchange="plotTorque(true)">
+        <option value="wheel" selected>Wheel TQ / Shift</option>
+        <option value="dyno">Power Curves</option>
+        <option value="accel_ts">Time vs Speed</option>
+        <option value="accel_td">Time vs Distance</option>
+        <option value="accel_tg">Time vs G's</option>
+        <option value="accel_sg">Speed vs G's</option>
+      </select>
+    </div>
 
     <!-- Accel-only controls -->
-    <label id="weightLbLabel" for="weightLb">Weight (lb):</label>
-    <input id="weightLb" type="number" value="580" min="300" max="1000" step="1" onchange="plotTorque(true)">
+    <div class="control-group">
+      <label id="weightLbLabel" for="weightLb">Weight (lb):</label>
+      <input id="weightLb" type="number" value="580" min="300" max="1000" step="1" onchange="plotTorque(true)">
+    </div>
 
-    <label id="shiftMsLabel" for="shiftMs">Shift Time (ms):</label>
-    <input id="shiftMs" type="number" value="80" min="0" max="300" step="10" onchange="plotTorque(true)">
+    <div class="control-group">
+      <label id="shiftMsLabel" for="shiftMs">Shift Time (ms):</label>
+      <input id="shiftMs" type="number" value="80" min="0" max="300" step="10" onchange="plotTorque(true)">
+    </div>
 
-    <label id="clipControl">
+    <div class="control-group">
       <input type="checkbox" id="truncateCross" onchange="plotTorque(false)">
-      Clip Lines
-    </label>
-
+      <label for="truncateCross">Clip Curves</label>
+    </div>
+  </div>
+  
+  <div class="button-row">
     <button onclick="freezeCurrentTraces()">Compare</button>
     <button onclick="clearFrozenTraces()">Reset</button>
   </div>
@@ -202,7 +404,7 @@ function regenerateFrozenTraces() {
   
   frozenConfigurations.forEach((config, configIndex) => {
     const dashStyle = (currentFamily === 'wheel') ? freezeDashStyles[configIndex % freezeDashStyles.length] : 'solid';
-    const { front, rear, hpKey, weightLb, shiftMs } = config;
+    const { front, rear, hpKey, weightLb, shiftMs, shiftRpmSetting } = config;
     const fd = rear / front;
     const rpmArr = rpmDense;
     const hpArr = hpDenseSets[hpKey];
@@ -223,7 +425,7 @@ function regenerateFrozenTraces() {
       frozenTraces.push({ x:[null], y:[null], mode:'lines', name:`Max TQ: ${maxTQ.toFixed(1)}`, showlegend:true, hoverinfo:'skip', line:{ color:lineColor, shape:'spline', width:2 } });
     }
     else if (currentFamily === 'accel') {
-      const sim = simulateAccel(hpArr, rpmArr, fd, 0.02, weightLb, shiftMs);
+      const sim = simulateAccel(hpArr, rpmArr, fd, 0.02, weightLb, shiftMs, shiftRpmSetting);
       let xData, yData, showShift = false;
       if (currentView === 'accel_ts') { xData = sim.T; yData = sim.V; showShift = true; }
       else if (currentView === 'accel_td') { xData = sim.T; yData = sim.S; }
@@ -246,7 +448,7 @@ function regenerateFrozenTraces() {
       }
     }
     else if (currentFamily === 'wheel') {
-      const { wt, shift_speed, shift_rpm } = computeShiftPoints(hpArr, fd, rpmArr);
+      const { wt, shift_speed, shift_rpm } = computeShiftPoints(hpArr, fd, rpmArr, shiftRpmSetting);
       const truncate = document.getElementById("truncateCross").checked;
       frozenTraces.push({ x:[null], y:[null], mode:'lines', name:`(F${front}/R${rear} ${hpKey})`, showlegend:true, hoverinfo:'skip', line:{ color: gear_colors[0], width: 2, dash: dashStyle, shape: 'spline' } });
       
@@ -300,30 +502,46 @@ function toggleControlVisibility() {
   });
   const clipEl = document.getElementById('clipControl');
   if (clipEl) clipEl.style.display = (view === 'wheel') ? 'inline-block' : 'none';
+  
+  // Adjust layout after visibility changes
+  setTimeout(() => adjustLayout(), 50);
 }
 
-// Shift points calc
-function computeShiftPoints(hpArr, final_drive, rpmArr) {
+// Shift points calc - with optional shift RPM override
+function computeShiftPoints(hpArr, final_drive, rpmArr, shiftRpmOverride = null) {
   const wt = {}, spd = {};
   for (let g = 1; g <= 6; g++) {
     wt[g]  = hpToWheelTorqueAt(rpmArr, hpArr, gear_ratios[g], final_drive);
     spd[g] = rpmArr.map(rpm => rpmToSpeed(rpm, gear_ratios[g], final_drive));
   }
+  
+  const shiftRpmSetting = shiftRpmOverride || (document.getElementById('shiftRpmSelect')?.value) || 'optimal';
   const shift_rpm = {}, shift_speed = {};
+  
   for (let g = 1; g <= 5; g++) {
-    const ratio  = gear_ratios[g + 1] / gear_ratios[g];
-    const diff   = [];
-    for (let i = 0; i < rpmArr.length; i++) {
-      const rp    = rpmArr[i];
-      const curTq = wt[g][i];
-      const nxtTq = interp1(rpmArr, wt[g + 1], rp * ratio);
-      diff.push(nxtTq - curTq);
-    }
-    let idx = diff.findIndex(d => d >= 0);
     let shiftRPM;
-    if (idx === -1) shiftRPM = rpmArr[rpmArr.length - 1];
-    else if (idx === 0) shiftRPM = rpmArr[0];
-    else shiftRPM = lerp(rpmArr[idx - 1], diff[idx - 1], rpmArr[idx], diff[idx], 0);
+    
+    if (shiftRpmSetting === 'optimal') {
+      // Original optimal shift point calculation
+      const ratio  = gear_ratios[g + 1] / gear_ratios[g];
+      const diff   = [];
+      for (let i = 0; i < rpmArr.length; i++) {
+        const rp    = rpmArr[i];
+        const curTq = wt[g][i];
+        const nxtTq = interp1(rpmArr, wt[g + 1], rp * ratio);
+        diff.push(nxtTq - curTq);
+      }
+      let idx = diff.findIndex(d => d >= 0);
+      if (idx === -1) shiftRPM = rpmArr[rpmArr.length - 1];
+      else if (idx === 0) shiftRPM = rpmArr[0];
+      else shiftRPM = lerp(rpmArr[idx - 1], diff[idx - 1], rpmArr[idx], diff[idx], 0);
+    } else {
+      // Use fixed RPM from dropdown
+      shiftRPM = parseFloat(shiftRpmSetting);
+      // Clamp to valid RPM range
+      shiftRPM = Math.max(rpmArr[0], Math.min(rpmArr[rpmArr.length - 1], shiftRPM));
+    }
+    
     shift_rpm[g]   = shiftRPM;
     shift_speed[g] = rpmToSpeed(shiftRPM, gear_ratios[g], final_drive);
   }
@@ -331,7 +549,7 @@ function computeShiftPoints(hpArr, final_drive, rpmArr) {
 }
 
 // Accel sim with trapezoidal distance and shift time
-function simulateAccel(hpArr, rpmArr, final_drive, dt = 0.02, mass_lb_param = getMassLb(), shift_ms = getShiftMs()) {
+function simulateAccel(hpArr, rpmArr, final_drive, dt = 0.02, mass_lb_param = getMassLb(), shift_ms = getShiftMs(), shiftRpmOverride = null) {
   function wheelTorqueAtSpeed(speed_mps, gear) {
     const speed_mph = speed_mps * MPS_TO_MPH;
     const rpm = Math.max(rpmArr[0], Math.min(rpmArr[rpmArr.length - 1], speedToRpm(speed_mph, gear_ratios[gear], final_drive)));
@@ -344,7 +562,7 @@ function simulateAccel(hpArr, rpmArr, final_drive, dt = 0.02, mass_lb_param = ge
 
   const mass_kg = mass_lb_param * LB_TO_KG;
   const max_rpm = rpmArr[rpmArr.length - 1];
-  const { shift_speed } = computeShiftPoints(hpArr, final_drive, rpmArr);
+  const { shift_speed } = computeShiftPoints(hpArr, final_drive, rpmArr, shiftRpmOverride);
 
   let g = 1, t = 0, v = 0, s = 0;
   let shiftCooldown = 0, pendingGear = null;
@@ -418,6 +636,35 @@ function populateHpDropdown() {
   if (keys.includes('Stock')) sel.value = 'Stock'; else if (keys.length) sel.value = keys[0];
 }
 
+function populateShiftRpmDropdown() {
+  const sel = document.getElementById('shiftRpmSelect');
+  sel.innerHTML = '';
+  
+  // Add 'Optimal' as first option
+  const optimalOpt = document.createElement('option');
+  optimalOpt.value = 'optimal'; optimalOpt.textContent = 'Optimal'; sel.appendChild(optimalOpt);
+  
+  // Get all distinct RPM values from hp_data_sets
+  const rpmSet = new Set();
+  Object.values(hp_data_sets).forEach(dataArray => {
+    dataArray.forEach(([rpm, hp]) => {
+      rpmSet.add(rpm);
+    });
+  });
+  
+  // Convert to sorted array (descending)
+  const distinctRpms = Array.from(rpmSet).sort((a, b) => b - a);
+  
+  // Add RPM options
+  distinctRpms.forEach(rpm => {
+    const opt = document.createElement('option');
+    opt.value = rpm; opt.textContent = `${rpm} RPM`; sel.appendChild(opt);
+  });
+  
+  // Set default to 'Optimal'
+  sel.value = 'optimal';
+}
+
 function getPlotBounds() {
   const all_hp = Object.values(hp_data_sets);
   const fd_ratios = [48/13, 48/14, 50/13, 50/14];
@@ -446,9 +693,10 @@ function freezeCurrentTraces() {
   const hpKey = document.getElementById('hpData').value;
   const weightLb = getMassLb();
   const shiftMs = getShiftMs();
+  const shiftRpmSetting = document.getElementById('shiftRpmSelect').value;
   
   // Add configuration to frozen configurations array
-  frozenConfigurations.push({ front, rear, hpKey, weightLb, shiftMs });
+  frozenConfigurations.push({ front, rear, hpKey, weightLb, shiftMs, shiftRpmSetting });
   freezeCount++;
   
   // Regenerate all frozen traces for current view
@@ -462,6 +710,7 @@ function clearFrozenTraces() {
   document.getElementById("front").value = "14";
   document.getElementById("rear").value = "48";
   document.getElementById("hpData").value = "Stock";
+  document.getElementById("shiftRpmSelect").value = "optimal";
   document.getElementById("truncateCross").checked = false;
   frozenConfigurations = []; frozenTraces = []; freezeCount = 0; frozenConnectorTraces = [];
   plotTorque();
@@ -517,7 +766,8 @@ function plotTorque(animate = true) {
       { x:[null], y:[null], mode:'lines', name:`Max HP: ${maxHP.toFixed(1)}`, showlegend:true, hoverinfo:'skip', line:{ color:currentColor, shape:'spline', width:2 } },
       { x:[null], y:[null], mode:'lines', name:`Max TQ: ${maxTQ.toFixed(1)}`, showlegend:true, hoverinfo:'skip', line:{ color:currentColor, shape:'spline', width:2 } }
     ];
-    const dynoLayout = { title:'HP and Torque', xaxis:{ title:'RPM', color:'white', autorange:false, range:[rpmArrRaw[0], rpmArrRaw[rpmArrRaw.length-1] + 2000] }, yaxis:{ title:'HP / TQ', color:'white', autorange:false, range:[0, dynoMaxHP] }, plot_bgcolor:'#111', paper_bgcolor:'#111', font:{ color:'white' }, transition:{ duration:1000, easing:'cubic-in-out' }, hovermode:'closest', hoverdistance:10 };
+    const viewTitle = document.getElementById('viewSelect').options[document.getElementById('viewSelect').selectedIndex].text;
+    const dynoLayout = { title: viewTitle, xaxis:{ title:'RPM', color:'white', autorange:false, range:[rpmArrRaw[0], rpmArrRaw[rpmArrRaw.length-1] + 2000] }, yaxis:{ title:'HP / TQ', color:'white', autorange:false, range:[0, dynoMaxHP] }, plot_bgcolor:'#111', paper_bgcolor:'#111', font:{ color:'white' }, transition:{ duration:1000, easing:'cubic-in-out' }, hovermode:'closest', hoverdistance:10 };
     const allDynoTraces = [...dynoTraces, ...legendTraces, ...frozenTraces];
     if (animate) Plotly.react('plot', allDynoTraces, dynoLayout, {responsive:true});
     else { const staticLayout = { ...dynoLayout }; delete staticLayout.transition; Plotly.newPlot('plot', allDynoTraces, staticLayout, {responsive:true}); }
@@ -555,8 +805,9 @@ function plotTorque(animate = true) {
       });
     }
 
+    const viewTitle = document.getElementById('viewSelect').options[document.getElementById('viewSelect').selectedIndex].text;
     const layout = {
-      title: 'Acceleration',
+      title: viewTitle,
       xaxis: lockX ? { title:xTitle, color:'white', range:[0,30] } : { title:xTitle, color:'white' },
       yaxis: lockY ? { title:yTitle, color:'white', range:[0,150] } : { title:yTitle, color:'white' },
       plot_bgcolor:'#111', paper_bgcolor:'#111', font:{ color:'white' },
@@ -609,7 +860,8 @@ function plotTorque(animate = true) {
     }
   }
 
-  const layout = { transition:{ duration:1000, easing:'cubic-in-out' }, hovermode:'closest', hoverdistance:10, title:'Wheel Torque / Shift Points', xaxis:{title:'Speed (MPH)', color:'white', range:[0,maxX]}, yaxis:{title:'Wheel Torque (lb-ft)', color:'white', range:[0,maxY]}, plot_bgcolor:'#111', paper_bgcolor:'#111', font:{color:'white'} };
+  const viewTitle = document.getElementById('viewSelect').options[document.getElementById('viewSelect').selectedIndex].text;
+  const layout = { transition:{ duration:1000, easing:'cubic-in-out' }, hovermode:'closest', hoverdistance:10, title: viewTitle, xaxis:{title:'Speed (MPH)', color:'white', range:[0,maxX]}, yaxis:{title:'Wheel Torque (lb-ft)', color:'white', range:[0,maxY]}, plot_bgcolor:'#111', paper_bgcolor:'#111', font:{color:'white'} };
   const allTraces = [...traces, ...connectorTraces, ...frozenTraces, ...frozenConnectorTraces];
   if (animate) Plotly.react('plot', allTraces, layout, {responsive: true});
   else { const staticLayout = { ...layout }; delete staticLayout.transition; Plotly.newPlot('plot', allTraces, staticLayout, {responsive: true}); }
@@ -617,9 +869,58 @@ function plotTorque(animate = true) {
   Plotly.Plots.resize(document.getElementById('plot'));
 }
 
-function init() { populateHpDropdown(); getPlotBounds(); plotTorque(); toggleControlVisibility(); }
+function adjustLayout() {
+  const plot = document.getElementById('plot');
+  const controls = document.querySelector('.controls');
+  const buttonRow = document.querySelector('.button-row');
+  const h1 = document.querySelector('h1');
+  
+  // Calculate available height
+  const windowHeight = window.innerHeight;
+  const windowWidth = window.innerWidth;
+  
+  // Get actual heights of elements
+  const controlsHeight = controls ? controls.offsetHeight : 0;
+  const buttonRowHeight = buttonRow ? buttonRow.offsetHeight : 0;
+  const h1Height = h1 ? h1.offsetHeight : 0;
+  
+  // Calculate available space for plot (with some padding)
+  const availableHeight = windowHeight - controlsHeight - buttonRowHeight - h1Height - 60; // 60px padding
+  const availableWidth = windowWidth - 20; // 20px padding
+  
+  // Calculate ideal plot dimensions maintaining 16:9 aspect ratio
+  let plotWidth = Math.min(availableWidth, availableHeight * (16/9));
+  let plotHeight = plotWidth * (9/16);
+  
+  // If calculated height is too large, constrain by height instead
+  if (plotHeight > availableHeight) {
+    plotHeight = availableHeight;
+    plotWidth = plotHeight * (16/9);
+  }
+  
+  // Apply the calculated dimensions
+  if (plot) {
+    plot.style.width = `${plotWidth}px`;
+    plot.style.height = `${plotHeight}px`;
+    plot.style.maxWidth = `${plotWidth}px`;
+    plot.style.maxHeight = `${plotHeight}px`;
+  }
+}
+
+function init() { 
+  populateHpDropdown(); 
+  populateShiftRpmDropdown(); 
+  getPlotBounds(); 
+  plotTorque(); 
+  toggleControlVisibility(); 
+  adjustLayout();
+}
+
 document.addEventListener('DOMContentLoaded', init);
-window.addEventListener('resize', () => plotTorque(false));
+window.addEventListener('resize', () => {
+  adjustLayout();
+  setTimeout(() => plotTorque(false), 100); // Small delay to let layout settle
+});
 </script>
 </body>
 </html>
