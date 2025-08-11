@@ -435,6 +435,8 @@ function regenerateFrozenTraces() {
       
       const lineColor = gear_colors[configIndex % gear_colors.length];
       frozenTraces.push({ x:[null], y:[null], mode:'lines', name:`(F${front}/R${rear} ${hpKey})`, showlegend:true, hoverinfo:'skip', line:{color:lineColor, width:2, shape:'spline'} });
+      frozenTraces.push({ x:[null], y:[null], mode:'lines', name:`Weight: ${weightLb} lb`, showlegend:true, hoverinfo:'skip', line:{color:lineColor, width:2, shape:'spline'} });
+      frozenTraces.push({ x:[null], y:[null], mode:'lines', name:`Shift Time: ${shiftMs} ms`, showlegend:true, hoverinfo:'skip', line:{color:lineColor, width:2, shape:'spline'} });
       frozenTraces.push({ x:xData, y:yData, mode:'lines', showlegend:false, hoverinfo:'x+y', line:{ color: lineColor, width:2, shape:'spline' }, opacity:0.7 });
       
       if (showShift) {
@@ -786,7 +788,13 @@ function plotTorque(animate = true) {
 
     const traces = [];
     const currentColor = gear_colors[freezeCount % gear_colors.length];
+    const weightLb = getMassLb();
+    const shiftMs = getShiftMs();
+    
+    // Add legend entries with configuration details
     traces.push({ x:[null], y:[null], mode:'lines', name:`(F${front}/R${rear} ${hpKey})`, showlegend:true, hoverinfo:'skip', line:{ color: currentColor, width:2, shape:'spline' } });
+    traces.push({ x:[null], y:[null], mode:'lines', name:`Weight: ${weightLb} lb`, showlegend:true, hoverinfo:'skip', line:{ color: currentColor, width:2, shape:'spline' } });
+    traces.push({ x:[null], y:[null], mode:'lines', name:`Shift Time: ${shiftMs} ms`, showlegend:true, hoverinfo:'skip', line:{ color: currentColor, width:2, shape:'spline' } });
     traces.push({ x:xData, y:yData, mode:'lines', name:'Acceleration View', showlegend:false, hoverinfo:'x+y',
       hovertemplate: (xTitle.startsWith('Time') ? `Time: %{x:.2f}s` : `Speed: %{x:.1f} mph`) + '<br>' +
         (yTitle.includes('MPH') ? `Speed: %{y:.1f} mph` : yTitle.includes('ft') ? `Distance: %{y:.0f} ft` : `Accel: %{y:.2f} g`) +
