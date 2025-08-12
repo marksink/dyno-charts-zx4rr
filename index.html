@@ -194,11 +194,189 @@
         max-height: calc(100vh - 250px);
       }
     }
+    
+    /* Settings Icon and Panel Styles */
+    .settings-icon {
+      font-size: 18px;
+      cursor: pointer;
+      color: #4a9eff;
+      transition: color 0.3s ease, transform 0.2s ease;
+      display: flex;
+      align-items: center;
+      padding: 4px;
+    }
+    
+    .settings-icon:hover {
+      color: #5ba3ff;
+      transform: rotate(90deg);
+    }
+    
+    .settings-panel {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.8);
+      display: none;
+      z-index: 9999;
+      backdrop-filter: blur(5px);
+    }
+    
+    .settings-content {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: linear-gradient(135deg, #2a2a2a 0%, #1a1a1a 100%);
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 12px;
+      padding: 24px;
+      min-width: 300px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+    }
+    
+    .settings-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+    
+    .settings-title {
+      font-size: 18px;
+      font-weight: 600;
+      color: #ffffff;
+    }
+    
+    .settings-close {
+      font-size: 24px;
+      cursor: pointer;
+      color: #999;
+      transition: color 0.3s ease;
+    }
+    
+    .settings-close:hover {
+      color: #fff;
+    }
+    
+    .settings-group {
+      margin-bottom: 16px;
+    }
+    
+    .settings-group label {
+      display: block;
+      margin-bottom: 6px;
+      font-weight: 500;
+      color: #d0d0d0;
+      font-size: 14px;
+    }
+    
+    .settings-group select {
+      width: 100%;
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.2);
+      color: #e8e8e8;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 14px;
+      transition: all 0.3s ease;
+    }
+    
+    .settings-group select:focus {
+      outline: none;
+      background: rgba(255,255,255,0.15);
+      border-color: #4a9eff;
+      box-shadow: 0 0 0 2px rgba(74,158,255,0.2);
+    }
+    
+    .settings-buttons {
+      display: flex;
+      justify-content: flex-end;
+      gap: 12px;
+      margin-top: 24px;
+    }
+    
+    .settings-btn {
+      background: linear-gradient(145deg, #4a9eff 0%, #357abd 100%);
+      border: none;
+      color: white;
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      box-shadow: 0 3px 8px rgba(74,158,255,0.3);
+    }
+    
+    .settings-btn:hover {
+      background: linear-gradient(145deg, #5ba3ff 0%, #3d82c7 100%);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(74,158,255,0.4);
+    }
+    
+    .settings-btn.secondary {
+      background: rgba(255,255,255,0.1);
+      box-shadow: 0 3px 8px rgba(0,0,0,0.2);
+    }
+    
+    .settings-btn.secondary:hover {
+      background: rgba(255,255,255,0.15);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
   </style>
 </head>
 <body>
+  
+  <!-- Settings Panel -->
+  <div id="settingsPanel" class="settings-panel" onclick="closeSettings(event)">
+    <div class="settings-content" onclick="event.stopPropagation()">
+      <div class="settings-header">
+        <div class="settings-title">Unit Preferences</div>
+        <div class="settings-close" onclick="closeSettings()">&times;</div>
+      </div>
+      
+      <div class="settings-group">
+        <label for="powerUnit">Power Unit:</label>
+        <select id="powerUnit" onchange="updateUnitPreferences()">
+          <option value="HP">HP (Horsepower)</option>
+          <option value="BHP">BHP (Brake Horsepower)</option>
+          <option value="PS">PS (Pferdestärke)</option>
+          <option value="kW">kW (Kilowatts)</option>
+        </select>
+      </div>
+      
+      <div class="settings-group">
+        <label for="torqueUnit">Torque Unit:</label>
+        <select id="torqueUnit" onchange="updateUnitPreferences()">
+          <option value="lb-ft">lb-ft (pound-feet)</option>
+          <option value="Nm">N⋅m (Newton-meters)</option>
+          <option value="kgfm">kgf⋅m (kilogram-force meters)</option>
+        </select>
+      </div>
+      
+      <div class="settings-group">
+        <label for="speedUnit">Speed Unit:</label>
+        <select id="speedUnit" onchange="updateUnitPreferences()">
+          <option value="MPH">MPH (miles per hour)</option>
+          <option value="kmh">km/h (kilometers per hour)</option>
+        </select>
+      </div>
+      
+      <div class="settings-buttons">
+        <button class="settings-btn secondary" onclick="resetUnitsToDefault()">Reset to Default</button>
+        <button class="settings-btn" onclick="closeSettings()">Done</button>
+      </div>
+    </div>
+  </div>
+
   <h1 style="text-align:center;">Kawasaki ZX-4R</h1>
   <div class="controls">
+    <div class="control-group">
+      <div class="settings-icon" onclick="openSettings()" title="Units Settings">⚙️</div>
+    </div>
+
     <div class="control-group">
       <label for="front">F-Sprocket:</label>
       <select id="front" onchange="plotTorque(true)">
@@ -280,16 +458,265 @@
   </div>
 
 <script>
+// -------- Unit Conversion System --------
+const UnitConverter = {
+  // Conversion factors to base units (HP for power, lb-ft for torque, MPH for speed)
+  power: {
+    'HP': 1.0,
+    'BHP': 1.0, // BHP ≈ HP
+    'PS': 1.0 / 0.98592, // 1 PS = 0.98592 HP
+    'kW': 1.0 / 0.746  // 1 HP = 0.746 kW
+  },
+  torque: {
+    'lb-ft': 1.0,
+    'Nm': 1.0 / 1.356, // 1 lb-ft = 1.356 N⋅m
+    'kgfm': 1.0 / 9.807 // 1 kgf⋅m = 9.807 N⋅m
+  },
+  speed: {
+    'MPH': 1.0,
+    'kmh': 1.0 / 1.609 // 1 MPH = 1.609 km/h
+  },
+  distance: {
+    'ft': 1.0,
+    'm': 1.0 / 3.28084 // 1 ft = 0.3048 m
+  },
+  weight: {
+    'lb': 1.0,
+    'kg': 1.0 / 2.20462 // 1 lb = 0.453592 kg
+  },
+  
+  // Convert from base unit to target unit
+  convertPower: function(value, targetUnit) {
+    return value / this.power[targetUnit];
+  },
+  
+  convertTorque: function(value, targetUnit) {
+    return value / this.torque[targetUnit];
+  },
+  
+  convertSpeed: function(value, targetUnit) {
+    return value / this.speed[targetUnit];
+  },
+  
+  convertDistance: function(value, targetUnit) {
+    return value / this.distance[targetUnit];
+  },
+  
+  convertWeight: function(value, targetUnit) {
+    return value * this.weight[targetUnit];
+  },
+  
+  // Format values with appropriate precision and unit symbol
+  formatPower: function(value, unit) {
+    const converted = this.convertPower(value, unit);
+    return `${converted.toFixed(1)} ${unit}`;
+  },
+  
+  formatTorque: function(value, unit) {
+    const converted = this.convertTorque(value, unit);
+    return `${converted.toFixed(1)} ${unit}`;
+  },
+  
+  formatSpeed: function(value, unit) {
+    const converted = this.convertSpeed(value, unit);
+    return `${converted.toFixed(1)} ${unit}`;
+  },
+  
+  formatDistance: function(value, unit) {
+    const converted = this.convertDistance(value, unit);
+    return `${converted.toFixed(0)} ${unit}`;
+  },
+  
+  formatWeight: function(value, unit) {
+    const converted = this.convertWeight(value, unit);
+    return `${converted.toFixed(0)} ${unit}`;
+  },
+  
+  // Get proper unit labels for axes
+  getPowerLabel: function(unit) {
+    const labels = {
+      'HP': 'Horsepower (HP)',
+      'BHP': 'Brake Horsepower (BHP)', 
+      'PS': 'Pferdestärke (PS)',
+      'kW': 'Kilowatts (kW)'
+    };
+    return labels[unit] || 'Power';
+  },
+  
+  getTorqueLabel: function(unit) {
+    const labels = {
+      'lb-ft': 'Torque (lb-ft)',
+      'Nm': 'Torque (N⋅m)',
+      'kgfm': 'Torque (kgf⋅m)'
+    };
+    return labels[unit] || 'Torque';
+  },
+  
+  getSpeedLabel: function(unit) {
+    const labels = {
+      'MPH': 'Speed (MPH)',
+      'kmh': 'Speed (km/h)'
+    };
+    return labels[unit] || 'Speed';
+  },
+  
+  getDistanceLabel: function(unit) {
+    const labels = {
+      'ft': 'Distance (ft)',
+      'm': 'Distance (m)'
+    };
+    return labels[unit] || 'Distance';
+  },
+  
+  // Get the appropriate distance unit based on speed unit
+  getDistanceUnit: function(speedUnit) {
+    return speedUnit === 'kmh' ? 'm' : 'ft';
+  },
+  
+  getWeightLabel: function(unit) {
+    const labels = {
+      'lb': 'Weight (lb)',
+      'kg': 'Weight (kg)'
+    };
+    return labels[unit] || 'Weight';
+  },
+  
+  // Get the appropriate weight unit based on speed unit
+  getWeightUnit: function(speedUnit) {
+    return speedUnit === 'kmh' ? 'kg' : 'lb';
+  }
+};
+
+// -------- User Preferences --------
+let userPreferences = {
+  power: 'HP',
+  torque: 'lb-ft',
+  speed: 'MPH'
+};
+
+// Load preferences from localStorage
+function loadUnitPreferences() {
+  try {
+    const saved = localStorage.getItem('dynoChartUnitPrefs');
+    if (saved) {
+      const prefs = JSON.parse(saved);
+      userPreferences = { ...userPreferences, ...prefs };
+    }
+  } catch (e) {
+    console.warn('Failed to load unit preferences:', e);
+  }
+  
+  // Update UI selectors
+  document.getElementById('powerUnit').value = userPreferences.power;
+  document.getElementById('torqueUnit').value = userPreferences.torque;
+  document.getElementById('speedUnit').value = userPreferences.speed;
+  
+  // Update weight control to match speed units
+  updateWeightControl();
+}
+
+// Save preferences to localStorage
+function saveUnitPreferences() {
+  try {
+    localStorage.setItem('dynoChartUnitPrefs', JSON.stringify(userPreferences));
+  } catch (e) {
+    console.warn('Failed to save unit preferences:', e);
+  }
+}
+
+// Update preferences from UI
+function updateUnitPreferences() {
+  userPreferences.power = document.getElementById('powerUnit').value;
+  userPreferences.torque = document.getElementById('torqueUnit').value;
+  userPreferences.speed = document.getElementById('speedUnit').value;
+  
+  saveUnitPreferences();
+  updateWeightControl(); // Update weight control units
+  plotTorque(false); // Re-render with new units
+}
+
+// Track the base weight in pounds to avoid conversion errors
+let baseWeightLb = 580;
+
+// Update weight control based on speed unit preference
+function updateWeightControl() {
+  const newWeightUnit = UnitConverter.getWeightUnit(userPreferences.speed);
+  const oldWeightUnit = UnitConverter.getWeightUnit(userPreferences.speed === 'kmh' ? 'MPH' : 'kmh'); // Get opposite unit
+  const weightLabel = document.getElementById('weightLbLabel');
+  const weightInput = document.getElementById('weightLb');
+  
+  if (weightLabel && weightInput) {
+    // Only update if the unit actually changed
+    const currentLabel = weightLabel.textContent;
+    const expectedLabel = UnitConverter.getWeightLabel(newWeightUnit) + ':';
+    
+    if (currentLabel !== expectedLabel) {
+      // Convert from base weight in pounds
+      const convertedValue = UnitConverter.convertWeight(baseWeightLb, newWeightUnit);
+      
+      // Update label and value
+      weightLabel.textContent = expectedLabel;
+      weightInput.value = Math.round(convertedValue);
+    }
+  }
+}
+
+// Reset to defaults
+function resetUnitsToDefault() {
+  userPreferences = {
+    power: 'HP',
+    torque: 'lb-ft',
+    speed: 'MPH'
+  };
+  
+  document.getElementById('powerUnit').value = userPreferences.power;
+  document.getElementById('torqueUnit').value = userPreferences.torque;
+  document.getElementById('speedUnit').value = userPreferences.speed;
+  
+  // Reset weight to default 580 lb equivalent in preferred units
+  baseWeightLb = 580;
+  const weightUnit = UnitConverter.getWeightUnit(userPreferences.speed);
+  const weightInput = document.getElementById('weightLb');
+  const weightLabel = document.getElementById('weightLbLabel');
+  
+  if (weightInput && weightLabel) {
+    const convertedWeight = UnitConverter.convertWeight(baseWeightLb, weightUnit);
+    weightInput.value = Math.round(convertedWeight);
+    weightLabel.textContent = UnitConverter.getWeightLabel(weightUnit) + ':';
+  }
+  
+  saveUnitPreferences();
+  plotTorque(false);
+}
+
+// Settings panel functions
+function openSettings() {
+  document.getElementById('settingsPanel').style.display = 'block';
+}
+
+function closeSettings(event) {
+  if (!event || event.target.id === 'settingsPanel' || event.target.classList.contains('settings-close')) {
+    document.getElementById('settingsPanel').style.display = 'none';
+  }
+}
+
 // -------- Constants & data --------
 const primary_drive = 2.029;
 const tire_circ_in  = 77.15;
 const gear_ratios   = {1:2.92, 2:2.05, 3:1.62, 4:1.33, 5:1.15, 6:1.03};
 
-// Accel sim
+// Accel sim - now handles different weight units
 function getMassLb() {
   const el = document.getElementById('weightLb');
   const v = el ? parseFloat(el.value) : 580;
-  return Number.isFinite(v) && v > 0 ? v : 580;
+  const weightUnit = UnitConverter.getWeightUnit(userPreferences.speed);
+  
+  if (Number.isFinite(v) && v > 0) {
+    // Update base weight when user changes input
+    baseWeightLb = weightUnit === 'kg' ? v * 2.20462 : v;
+    return baseWeightLb;
+  }
+  return 580; // Default in lb
 }
 function getShiftMs() {
   const el = document.getElementById('shiftMs');
@@ -416,28 +843,59 @@ function regenerateFrozenTraces() {
       const hpArrRaw = hp_data_sets[hpKey].map(([r, hp]) => hp);
       const rpmArrRaw = hp_data_sets[hpKey].map(([r, hp]) => r);
       const engTq = hp_data_sets[hpKey].map(([rpm, hp]) => (hp * 5252) / rpm);
+      
+      // Convert to user's preferred units
+      const hpConverted = hpArrRaw.map(hp => UnitConverter.convertPower(hp, userPreferences.power));
+      const tqConverted = engTq.map(tq => UnitConverter.convertTorque(tq, userPreferences.torque));
+      
       const lineColor = gear_colors[configIndex % gear_colors.length];
-      frozenTraces.push({ x:rpmArrRaw, y:engTq, mode:'lines', showlegend:false, hoverinfo:'x+y', hovertemplate:'RPM: %{x} RPM<br>Torque: %{y:.1f} lb-ft<extra></extra>', line:{ color: lineColor, shape:'spline', width:2 }, opacity:0.7 });
-      frozenTraces.push({ x:rpmArrRaw, y:hpArrRaw, mode:'lines', showlegend:false, hoverinfo:'x+y', hovertemplate:'RPM: %{x} RPM<br>HP: %{y:.1f}<extra></extra>', line:{ color: lineColor, shape:'spline', width:2 }, opacity:0.7 });
-      const maxHP = Math.max(...hpArrRaw), maxTQ = Math.max(...engTq);
+      frozenTraces.push({ x:rpmArrRaw, y:tqConverted, mode:'lines', showlegend:false, hoverinfo:'x+y', hovertemplate:`RPM: %{x} RPM<br>Torque: %{y:.1f} ${userPreferences.torque}<extra></extra>`, line:{ color: lineColor, shape:'spline', width:2 }, opacity:0.7 });
+      frozenTraces.push({ x:rpmArrRaw, y:hpConverted, mode:'lines', showlegend:false, hoverinfo:'x+y', hovertemplate:`RPM: %{x} RPM<br>Power: %{y:.1f} ${userPreferences.power}<extra></extra>`, line:{ color: lineColor, shape:'spline', width:2 }, opacity:0.7 });
+      const maxHP = Math.max(...hpConverted), maxTQ = Math.max(...tqConverted);
       frozenTraces.push({ x:[null], y:[null], mode:'lines', name:hpKey, showlegend:true, hoverinfo:'skip', line:{ color:'rgba(0,0,0,0)', width:0 } });
-      frozenTraces.push({ x:[null], y:[null], mode:'lines', name:`Max HP: ${maxHP.toFixed(1)}`, showlegend:true, hoverinfo:'skip', line:{ color:lineColor, shape:'spline', width:2 } });
-      frozenTraces.push({ x:[null], y:[null], mode:'lines', name:`Max TQ: ${maxTQ.toFixed(1)}`, showlegend:true, hoverinfo:'skip', line:{ color:lineColor, shape:'spline', width:2 } });
+      frozenTraces.push({ x:[null], y:[null], mode:'lines', name:`Max ${userPreferences.power}: ${maxHP.toFixed(1)}`, showlegend:true, hoverinfo:'skip', line:{ color:lineColor, shape:'spline', width:2 } });
+      frozenTraces.push({ x:[null], y:[null], mode:'lines', name:`Max ${userPreferences.torque}: ${maxTQ.toFixed(1)}`, showlegend:true, hoverinfo:'skip', line:{ color:lineColor, shape:'spline', width:2 } });
     }
     else if (currentFamily === 'accel') {
       const sim = simulateAccel(hpArr, rpmArr, fd, 0.02, weightLb, shiftMs, shiftRpmSetting);
       let xData, yData, showShift = false;
-      if (currentView === 'accel_ts') { xData = sim.T; yData = sim.V; showShift = true; }
-      else if (currentView === 'accel_td') { xData = sim.T; yData = sim.S; }
+      
+      // Convert speed data to user's preferred units  
+      const speedConverted = sim.V.map(mph => UnitConverter.convertSpeed(mph, userPreferences.speed));
+      
+      // Convert distance data based on speed unit preference
+      const distanceUnit = UnitConverter.getDistanceUnit(userPreferences.speed);
+      const distanceConverted = sim.S.map(ft => UnitConverter.convertDistance(ft, distanceUnit));
+      
+      if (currentView === 'accel_ts') { xData = sim.T; yData = speedConverted; showShift = true; }
+      else if (currentView === 'accel_td') { xData = sim.T; yData = distanceConverted; }
       else if (currentView === 'accel_tg') { xData = sim.T; yData = sim.A.map(a=>a/g_mps2); }
-      else if (currentView === 'accel_sg') { xData = sim.V; yData = sim.A.map(a=>a/g_mps2); }
-      else { xData = sim.T; yData = sim.V; }
+      else if (currentView === 'accel_sg') { xData = speedConverted; yData = sim.A.map(a=>a/g_mps2); }
+      else { xData = sim.T; yData = speedConverted; }
       
       const lineColor = gear_colors[configIndex % gear_colors.length];
+      const weightUnit = UnitConverter.getWeightUnit(userPreferences.speed);
+      const displayWeight = UnitConverter.convertWeight(weightLb, weightUnit);
+      
       frozenTraces.push({ x:[null], y:[null], mode:'lines', name:`(F${front}/R${rear} ${hpKey})`, showlegend:true, hoverinfo:'skip', line:{color:lineColor, width:2, shape:'spline'} });
-      frozenTraces.push({ x:[null], y:[null], mode:'lines', name:`Weight: ${weightLb} lb`, showlegend:true, hoverinfo:'skip', line:{color:lineColor, width:2, shape:'spline'} });
+      frozenTraces.push({ x:[null], y:[null], mode:'lines', name:`Weight: ${Math.round(displayWeight)} ${weightUnit}`, showlegend:true, hoverinfo:'skip', line:{color:lineColor, width:2, shape:'spline'} });
       frozenTraces.push({ x:[null], y:[null], mode:'lines', name:`Shift Time: ${shiftMs} ms`, showlegend:true, hoverinfo:'skip', line:{color:lineColor, width:2, shape:'spline'} });
-      frozenTraces.push({ x:xData, y:yData, mode:'lines', showlegend:false, hoverinfo:'x+y', line:{ color: lineColor, width:2, shape:'spline' }, opacity:0.7 });
+      // Create proper hover template for frozen traces
+      let hoverTemplate;
+      if (currentView === 'accel_ts') {
+        hoverTemplate = `Time: %{x:.2f}s<br>Speed: %{y:.1f} ${userPreferences.speed}<extra></extra>`;
+      } else if (currentView === 'accel_td') {
+        const distanceUnit = UnitConverter.getDistanceUnit(userPreferences.speed);
+        hoverTemplate = `Time: %{x:.2f}s<br>Distance: %{y:.0f} ${distanceUnit}<extra></extra>`;
+      } else if (currentView === 'accel_tg') {
+        hoverTemplate = `Time: %{x:.2f}s<br>Accel: %{y:.2f} g<extra></extra>`;
+      } else if (currentView === 'accel_sg') {
+        hoverTemplate = `Speed: %{x:.1f} ${userPreferences.speed}<br>Accel: %{y:.2f} g<extra></extra>`;
+      } else {
+        hoverTemplate = `Time: %{x:.2f}s<br>Speed: %{y:.1f} ${userPreferences.speed}<extra></extra>`;
+      }
+      
+      frozenTraces.push({ x:xData, y:yData, mode:'lines', showlegend:false, hoverinfo:'x+y', hovertemplate: hoverTemplate, line:{ color: lineColor, width:2, shape:'spline' }, opacity:0.7 });
       
       if (showShift) {
         sim.shiftMarkers.forEach(m => {
@@ -458,35 +916,49 @@ function regenerateFrozenTraces() {
       for (let g = 1; g <= 6; g++) {
         const speeds = rpmArr.map(r => rpmToSpeed(r, gear_ratios[g], fd));
         const torques = hpToWheelTorqueAt(rpmArr, hpArr, gear_ratios[g], fd);
-        let xPts = [], yPts = [];
+        let xPts = [], yPts = [], rpmPts = [];
         for (let i = 0; i < rpmArr.length; i++) {
-          const sp = speeds[i], tq = torques[i];
+          const sp = speeds[i], tq = torques[i], rp = rpmArr[i];
           const inRange = !truncate || ((g > 1 ? sp >= shift_speed[g-1] : true) && (g < 6 ? sp <= shift_speed[g] : true));
-          if (inRange) { xPts.push(sp); yPts.push(tq); }
+          if (inRange) { 
+            xPts.push(UnitConverter.convertSpeed(sp, userPreferences.speed)); 
+            yPts.push(UnitConverter.convertTorque(tq, userPreferences.torque));
+            rpmPts.push(rp);
+          }
         }
         if (xPts.length) {
           let label = `Gear ${g}`;
-          if (g < 6 && shift_rpm[g] != null) label += ` (${Math.round(shift_rpm[g])} RPM / ${shift_speed[g].toFixed(1)} MPH)`;
-          else if (g === 6) { const red = rpmArr[rpmArr.length - 1]; const sp = rpmToSpeed(red, gear_ratios[g], fd); label += ` (${Math.round(red)} RPM / ${sp.toFixed(1)} MPH)`; }
-          frozenTraces.push({ x: xPts, y: yPts, mode: 'lines', name: label, showlegend: true, hovertemplate: 'Speed: %{x:.1f} MPH<br>Torque: %{y:.1f} lb-ft<extra></extra>', line: { color: gear_colors[g-1], dash: dashStyle, width: 2, shape: 'spline', opacity: 0.3 } });
+          if (g < 6 && shift_rpm[g] != null) {
+            const convertedShiftSpeed = UnitConverter.convertSpeed(shift_speed[g], userPreferences.speed);
+            label += ` (${Math.round(shift_rpm[g])} RPM / ${convertedShiftSpeed.toFixed(1)} ${userPreferences.speed})`;
+          }
+          else if (g === 6) { 
+            const red = rpmArr[rpmArr.length - 1]; 
+            const sp = rpmToSpeed(red, gear_ratios[g], fd);
+            const convertedSp = UnitConverter.convertSpeed(sp, userPreferences.speed);
+            label += ` (${Math.round(red)} RPM / ${convertedSp.toFixed(1)} ${userPreferences.speed})`; 
+          }
+          frozenTraces.push({ x: xPts, y: yPts, customdata: rpmPts, mode: 'lines', name: label, showlegend: true, hovertemplate: `Speed: %{x:.1f} ${userPreferences.speed}<br>RPM: %{customdata:.0f} RPM<br>Torque: %{y:.1f} ${userPreferences.torque}<extra></extra>`, line: { color: gear_colors[g-1], dash: dashStyle, width: 2, shape: 'spline', opacity: 0.3 } });
         }
       }
       
       // Add shift point connectors
+      const maxYConverted = UnitConverter.convertTorque(maxY, userPreferences.torque);
       for (let g = 1; g <= 5; g++) {
         const xShift = shift_speed[g];
         if (xShift != null) {
-          const yLabel = Math.max(0, (0.97 - configIndex * 0.03)) * maxY;
+          const yLabel = Math.max(0, (0.97 - configIndex * 0.03)) * maxYConverted;
           const speedsNext = rpmArr.map(r => rpmToSpeed(r, gear_ratios[g + 1], fd));
           const idxNext = speedsNext.findIndex(s => s >= xShift);
-          const torqueNext = idxNext !== -1 ? wt[g + 1][idxNext] : 0;
+          const torqueNext = idxNext !== -1 ? UnitConverter.convertTorque(wt[g + 1][idxNext], userPreferences.torque) : 0;
+          const xShiftConverted = UnitConverter.convertSpeed(xShift, userPreferences.speed);
           frozenConnectorTraces.push({
-            x: [xShift, xShift], y: [yLabel, torqueNext], mode: 'lines',
+            x: [xShiftConverted, xShiftConverted], y: [yLabel, torqueNext], mode: 'lines',
             line: { color: gear_colors[g - 1], width: 1, dash: dashStyle },
             showlegend: false, hoverinfo: 'skip'
           });
           frozenConnectorTraces.push({
-            x: [xShift], y: [yLabel], mode: 'text', text: [`${xShift.toFixed(1)} MPH`],
+            x: [xShiftConverted], y: [yLabel], mode: 'text', text: [`${xShiftConverted.toFixed(1)} ${userPreferences.speed}`],
             textposition: 'top center', textfont: { color: gear_colors[g - 1] },
             showlegend: false, hoverinfo: 'skip', cliponaxis: false
           });
@@ -757,19 +1229,25 @@ function plotTorque(animate = true) {
     const hpArrRaw = hp_data_sets[hpKey].map(([r, hp]) => hp);
     const rpmArrRaw = hp_data_sets[hpKey].map(([r, hp]) => r);
     const engTq = hp_data_sets[hpKey].map(([rpm, hp]) => (hp * 5252) / rpm);
+    
+    // Convert to user's preferred units
+    const hpConverted = hpArrRaw.map(hp => UnitConverter.convertPower(hp, userPreferences.power));
+    const tqConverted = engTq.map(tq => UnitConverter.convertTorque(tq, userPreferences.torque));
+    
     const currentColor = gear_colors[freezeCount % gear_colors.length];
     const dynoTraces = [
-      { x: rpmArrRaw, y: engTq, mode:'lines', showlegend:false, hoverinfo:'x+y', hovertemplate:'RPM: %{x} RPM<br>Torque: %{y:.1f} lb-ft<extra></extra>', line:{ color: currentColor, shape:'spline', width:2 } },
-      { x: rpmArrRaw, y: hpArrRaw, mode:'lines', showlegend:false, hoverinfo:'x+y', hovertemplate:'RPM: %{x} RPM<br>HP: %{y:.1f}<extra></extra>', line:{ color: currentColor, shape:'spline', width:2 } }
+      { x: rpmArrRaw, y: tqConverted, mode:'lines', showlegend:false, hoverinfo:'x+y', hovertemplate:`RPM: %{x} RPM<br>Torque: %{y:.1f} ${userPreferences.torque}<extra></extra>`, line:{ color: currentColor, shape:'spline', width:2 } },
+      { x: rpmArrRaw, y: hpConverted, mode:'lines', showlegend:false, hoverinfo:'x+y', hovertemplate:`RPM: %{x} RPM<br>Power: %{y:.1f} ${userPreferences.power}<extra></extra>`, line:{ color: currentColor, shape:'spline', width:2 } }
     ];
-    const maxHP = Math.max(...hpArrRaw), maxTQ = Math.max(...engTq);
+    const maxHP = Math.max(...hpConverted), maxTQ = Math.max(...tqConverted);
     const legendTraces = [
       { x:[null], y:[null], mode:'lines', name:hpKey, showlegend:true, hoverinfo:'skip', line:{ color:'rgba(0,0,0,0)', width:0 } },
-      { x:[null], y:[null], mode:'lines', name:`Max HP: ${maxHP.toFixed(1)}`, showlegend:true, hoverinfo:'skip', line:{ color:currentColor, shape:'spline', width:2 } },
-      { x:[null], y:[null], mode:'lines', name:`Max TQ: ${maxTQ.toFixed(1)}`, showlegend:true, hoverinfo:'skip', line:{ color:currentColor, shape:'spline', width:2 } }
+      { x:[null], y:[null], mode:'lines', name:`Max ${userPreferences.power}: ${maxHP.toFixed(1)}`, showlegend:true, hoverinfo:'skip', line:{ color:currentColor, shape:'spline', width:2 } },
+      { x:[null], y:[null], mode:'lines', name:`Max ${userPreferences.torque}: ${maxTQ.toFixed(1)}`, showlegend:true, hoverinfo:'skip', line:{ color:currentColor, shape:'spline', width:2 } }
     ];
     const viewTitle = document.getElementById('viewSelect').options[document.getElementById('viewSelect').selectedIndex].text;
-    const dynoLayout = { title: viewTitle, xaxis:{ title:'RPM', color:'white', autorange:false, range:[rpmArrRaw[0], rpmArrRaw[rpmArrRaw.length-1] + 2000] }, yaxis:{ title:'HP / TQ', color:'white', autorange:false, range:[0, dynoMaxHP] }, plot_bgcolor:'#111', paper_bgcolor:'#111', font:{ color:'white' }, transition:{ duration:1000, easing:'cubic-in-out' }, hovermode:'closest', hoverdistance:10 };
+    const dynoYMax = Math.ceil(Math.max(maxHP, maxTQ) * 1.1 / 10) * 10;
+    const dynoLayout = { title: viewTitle, xaxis:{ title:'RPM', color:'white', autorange:false, range:[rpmArrRaw[0], rpmArrRaw[rpmArrRaw.length-1] + 2000] }, yaxis:{ title:`${UnitConverter.getPowerLabel(userPreferences.power)} / ${UnitConverter.getTorqueLabel(userPreferences.torque)}`, color:'white', autorange:false, range:[0, dynoYMax] }, plot_bgcolor:'#111', paper_bgcolor:'#111', font:{ color:'white' }, transition:{ duration:1000, easing:'cubic-in-out' }, hovermode:'closest', hoverdistance:10 };
     const allDynoTraces = [...dynoTraces, ...legendTraces, ...frozenTraces];
     if (animate) Plotly.react('plot', allDynoTraces, dynoLayout, {responsive:true});
     else { const staticLayout = { ...dynoLayout }; delete staticLayout.transition; Plotly.newPlot('plot', allDynoTraces, staticLayout, {responsive:true}); }
@@ -780,11 +1258,36 @@ function plotTorque(animate = true) {
   if (fam === 'accel') {
     const sim = simulateAccel(hpArr, rpmArr, fd, 0.02);
     let xData, yData, xTitle, yTitle, lockX=false, lockY=false, showShift=false;
-    if (view === 'accel_ts') { xData = sim.T; yData = sim.V; xTitle='Time (s)'; yTitle='Speed (MPH)'; lockX=true; lockY=true; showShift=true; }
-    else if (view === 'accel_td') { xData = sim.T; yData = sim.S; xTitle='Time (s)'; yTitle='Distance (ft)'; }
+    
+    // Convert speed data to user's preferred units
+    const speedConverted = sim.V.map(mph => UnitConverter.convertSpeed(mph, userPreferences.speed));
+    const speedMax = Math.ceil(Math.max(...speedConverted) * 1.1 / 10) * 10;
+    
+    // Convert distance data based on speed unit preference
+    const distanceUnit = UnitConverter.getDistanceUnit(userPreferences.speed);
+    const distanceConverted = sim.S.map(ft => UnitConverter.convertDistance(ft, distanceUnit));
+    
+    if (view === 'accel_ts') { 
+      xData = sim.T; 
+      yData = speedConverted; 
+      xTitle='Time (s)'; 
+      yTitle=UnitConverter.getSpeedLabel(userPreferences.speed); 
+      lockX=true; lockY=true; showShift=true; 
+    }
+    else if (view === 'accel_td') { 
+      xData = sim.T; 
+      yData = distanceConverted; 
+      xTitle='Time (s)'; 
+      yTitle=UnitConverter.getDistanceLabel(distanceUnit); 
+    }
     else if (view === 'accel_tg') { xData = sim.T; yData = sim.A.map(a=>a/g_mps2); xTitle='Time (s)'; yTitle='Acceleration (g)'; }
-    else if (view === 'accel_sg') { xData = sim.V; yData = sim.A.map(a=>a/g_mps2); xTitle='Speed (MPH)'; yTitle='Acceleration (g)'; }
-    else { xData = sim.T; yData = sim.V; xTitle='Time (s)'; yTitle='Speed (MPH)'; }
+    else if (view === 'accel_sg') { 
+      xData = speedConverted; 
+      yData = sim.A.map(a=>a/g_mps2); 
+      xTitle=UnitConverter.getSpeedLabel(userPreferences.speed); 
+      yTitle='Acceleration (g)'; 
+    }
+    else { xData = sim.T; yData = speedConverted; xTitle='Time (s)'; yTitle=UnitConverter.getSpeedLabel(userPreferences.speed); }
 
     const traces = [];
     const currentColor = gear_colors[freezeCount % gear_colors.length];
@@ -792,12 +1295,17 @@ function plotTorque(animate = true) {
     const shiftMs = getShiftMs();
     
     // Add legend entries with configuration details
+    const weightUnit = UnitConverter.getWeightUnit(userPreferences.speed);
+    const displayWeight = UnitConverter.convertWeight(weightLb, weightUnit);
+    
     traces.push({ x:[null], y:[null], mode:'lines', name:`(F${front}/R${rear} ${hpKey})`, showlegend:true, hoverinfo:'skip', line:{ color: currentColor, width:2, shape:'spline' } });
-    traces.push({ x:[null], y:[null], mode:'lines', name:`Weight: ${weightLb} lb`, showlegend:true, hoverinfo:'skip', line:{ color: currentColor, width:2, shape:'spline' } });
+    traces.push({ x:[null], y:[null], mode:'lines', name:`Weight: ${Math.round(displayWeight)} ${weightUnit}`, showlegend:true, hoverinfo:'skip', line:{ color: currentColor, width:2, shape:'spline' } });
     traces.push({ x:[null], y:[null], mode:'lines', name:`Shift Time: ${shiftMs} ms`, showlegend:true, hoverinfo:'skip', line:{ color: currentColor, width:2, shape:'spline' } });
     traces.push({ x:xData, y:yData, mode:'lines', name:'Acceleration View', showlegend:false, hoverinfo:'x+y',
-      hovertemplate: (xTitle.startsWith('Time') ? `Time: %{x:.2f}s` : `Speed: %{x:.1f} mph`) + '<br>' +
-        (yTitle.includes('MPH') ? `Speed: %{y:.1f} mph` : yTitle.includes('ft') ? `Distance: %{y:.0f} ft` : `Accel: %{y:.2f} g`) +
+      hovertemplate: (xTitle.startsWith('Time') ? `Time: %{x:.2f}s` : `Speed: %{x:.1f} ${userPreferences.speed}`) + '<br>' +
+        (yTitle.includes('Speed') ? `Speed: %{y:.1f} ${userPreferences.speed}` : 
+         yTitle.includes('Distance') ? `Distance: %{y:.0f} ${yTitle.includes('(m)') ? 'm' : 'ft'}` : 
+         `Accel: %{y:.2f} g`) +
         '<extra></extra>',
       line:{ color: currentColor, width:2, shape:'spline' } });
 
@@ -817,7 +1325,7 @@ function plotTorque(animate = true) {
     const layout = {
       title: viewTitle,
       xaxis: lockX ? { title:xTitle, color:'white', range:[0,30] } : { title:xTitle, color:'white' },
-      yaxis: lockY ? { title:yTitle, color:'white', range:[0,150] } : { title:yTitle, color:'white' },
+      yaxis: lockY ? { title:yTitle, color:'white', range:[0,speedMax || 150] } : { title:yTitle, color:'white' },
       plot_bgcolor:'#111', paper_bgcolor:'#111', font:{ color:'white' },
       hovermode:'closest', hoverdistance:10, transition:{ duration:1000, easing:'cubic-in-out' }
     };
@@ -844,32 +1352,49 @@ function plotTorque(animate = true) {
     for (let i = 0; i < rpmArr.length; i++) {
       const sp = speeds[i], tq = torques[i], rp = rpmArr[i];
       const inRange = !truncate || ((g > 1 ? sp >= shift_speed[g-1] : true) && (g < 6 ? sp <= shift_speed[g] : true));
-      if (inRange) { xPts.push(sp); yPts.push(tq); rpmPts.push(rp); }
+      if (inRange) { 
+        xPts.push(UnitConverter.convertSpeed(sp, userPreferences.speed)); 
+        yPts.push(UnitConverter.convertTorque(tq, userPreferences.torque)); 
+        rpmPts.push(rp); 
+      }
     }
     if (xPts.length) {
       let label = `Gear ${g}`;
-      if (g < 6 && shift_rpm[g] != null) label += ` (${Math.round(shift_rpm[g])} RPM / ${shift_speed[g].toFixed(1)} MPH)`;
-      else if (g === 6) { const red = rpmArr[rpmArr.length - 1]; const sp = rpmToSpeed(red, gear_ratios[g], fd); label += ` (${Math.round(red)} RPM / ${sp.toFixed(1)} MPH)`; }
-      traces.push({ x:xPts, y:yPts, customdata:rpmPts, mode:'lines', name:label, line:{ color:gear_colors[g-1], width:2, shape:'spline' }, opacity:1, hovertemplate:'Speed: %{x:.1f} MPH<br>RPM: %{customdata:.0f} RPM<br>Torque: %{y:.1f} lb-ft<extra></extra>' });
+      if (g < 6 && shift_rpm[g] != null) {
+        const convertedShiftSpeed = UnitConverter.convertSpeed(shift_speed[g], userPreferences.speed);
+        label += ` (${Math.round(shift_rpm[g])} RPM / ${convertedShiftSpeed.toFixed(1)} ${userPreferences.speed})`;
+      }
+      else if (g === 6) { 
+        const red = rpmArr[rpmArr.length - 1]; 
+        const sp = rpmToSpeed(red, gear_ratios[g], fd); 
+        const convertedSp = UnitConverter.convertSpeed(sp, userPreferences.speed);
+        label += ` (${Math.round(red)} RPM / ${convertedSp.toFixed(1)} ${userPreferences.speed})`; 
+      }
+      traces.push({ x:xPts, y:yPts, customdata:rpmPts, mode:'lines', name:label, line:{ color:gear_colors[g-1], width:2, shape:'spline' }, opacity:1, hovertemplate:`Speed: %{x:.1f} ${userPreferences.speed}<br>RPM: %{customdata:.0f} RPM<br>Torque: %{y:.1f} ${userPreferences.torque}<extra></extra>` });
     }
   }
 
   const connectorTraces = [];
+  // Calculate converted max values for layout
+  const maxXConverted = UnitConverter.convertSpeed(maxX, userPreferences.speed);
+  const maxYConverted = UnitConverter.convertTorque(maxY, userPreferences.torque);
+  
   for (let g = 1; g <= 5; g++) {
     const xShift = shift_speed[g];
     if (xShift != null) {
       const baseRatio = 0.97, stepRatio = 0.03;
-      const yLabel = Math.max(0, baseRatio - freezeCount * stepRatio) * maxY;
+      const yLabel = Math.max(0, baseRatio - freezeCount * stepRatio) * maxYConverted;
       const speedsNext = rpmArr.map(r => rpmToSpeed(r, gear_ratios[g + 1], fd));
       const idxNext = speedsNext.findIndex(s => s >= xShift);
-      const torqueNext = idxNext !== -1 ? wt[g + 1][idxNext] : 0;
-      connectorTraces.push({ x:[xShift, xShift], y:[yLabel, torqueNext], mode:'lines', line:{ color:gear_colors[g - 1], width:2, dash: activeDash || 'solid' }, showlegend:false, hoverinfo:'skip' });
-      connectorTraces.push({ x:[xShift], y:[yLabel], mode:'text', text:[`${xShift.toFixed(1)} MPH`], textposition:'top center', textfont:{ color:gear_colors[g - 1] }, showlegend:false, hoverinfo:'skip', cliponaxis:false });
+      const torqueNext = idxNext !== -1 ? UnitConverter.convertTorque(wt[g + 1][idxNext], userPreferences.torque) : 0;
+      const xShiftConverted = UnitConverter.convertSpeed(xShift, userPreferences.speed);
+      connectorTraces.push({ x:[xShiftConverted, xShiftConverted], y:[yLabel, torqueNext], mode:'lines', line:{ color:gear_colors[g - 1], width:2, dash: activeDash || 'solid' }, showlegend:false, hoverinfo:'skip' });
+      connectorTraces.push({ x:[xShiftConverted], y:[yLabel], mode:'text', text:[`${xShiftConverted.toFixed(1)} ${userPreferences.speed}`], textposition:'top center', textfont:{ color:gear_colors[g - 1] }, showlegend:false, hoverinfo:'skip', cliponaxis:false });
     }
   }
 
   const viewTitle = document.getElementById('viewSelect').options[document.getElementById('viewSelect').selectedIndex].text;
-  const layout = { transition:{ duration:1000, easing:'cubic-in-out' }, hovermode:'closest', hoverdistance:10, title: viewTitle, xaxis:{title:'Speed (MPH)', color:'white', range:[0,maxX]}, yaxis:{title:'Wheel Torque (lb-ft)', color:'white', range:[0,maxY]}, plot_bgcolor:'#111', paper_bgcolor:'#111', font:{color:'white'} };
+  const layout = { transition:{ duration:1000, easing:'cubic-in-out' }, hovermode:'closest', hoverdistance:10, title: viewTitle, xaxis:{title:UnitConverter.getSpeedLabel(userPreferences.speed), color:'white', range:[0,maxXConverted]}, yaxis:{title:`Wheel ${UnitConverter.getTorqueLabel(userPreferences.torque)}`, color:'white', range:[0,maxYConverted]}, plot_bgcolor:'#111', paper_bgcolor:'#111', font:{color:'white'} };
   const allTraces = [...traces, ...connectorTraces, ...frozenTraces, ...frozenConnectorTraces];
   if (animate) Plotly.react('plot', allTraces, layout, {responsive: true});
   else { const staticLayout = { ...layout }; delete staticLayout.transition; Plotly.newPlot('plot', allTraces, staticLayout, {responsive: true}); }
@@ -916,6 +1441,7 @@ function adjustLayout() {
 }
 
 function init() { 
+  loadUnitPreferences(); // Load saved preferences
   populateHpDropdown(); 
   populateShiftRpmDropdown(); 
   getPlotBounds(); 
