@@ -410,11 +410,6 @@
     </div>
 
     <div class="control-group">
-      <label for="shiftRpmSelect">Shift RPM:</label>
-      <select id="shiftRpmSelect" onchange="plotTorque(true)"></select>
-    </div>
-
-    <div class="control-group">
       <label for="viewSelect">Plot:</label>
       <select id="viewSelect" onchange="plotTorque(true)">
         <option value="wheel" selected>Wheel TQ / Shift</option>
@@ -424,6 +419,11 @@
         <option value="accel_tg">Time vs G's</option>
         <option value="accel_sg">Speed vs G's</option>
       </select>
+    </div>
+
+    <div class="control-group">
+      <label for="shiftRpmSelect">Shift RPM:</label>
+      <select id="shiftRpmSelect" onchange="plotTorque(true)"></select>
     </div>
 
     <!-- Accel-only controls -->
@@ -1067,7 +1067,8 @@ function simulateAccel(hpArr, rpmArr, final_drive, dt = 0.02, mass_lb_param = ge
     }
 
     const rpm_now = speedToRpm(v * MPS_TO_MPH, gear_ratios[g], final_drive);
-    if (g === 6 && rpm_now >= max_rpm) break;
+    // Only terminate at redline if we've reached at least 35 seconds
+    if (t >= 35 && g === 6 && rpm_now >= max_rpm) break;
 
     const F_roll = Crr * mass_kg * g_mps2;
     const F_aero = 0.5 * rho_air * CdA * v * v;
@@ -1085,8 +1086,9 @@ function simulateAccel(hpArr, rpmArr, final_drive, dt = 0.02, mass_lb_param = ge
     S.push(s * M_TO_FT);
     G.push(g);
 
-    if (a < 0.05 && v > 60 * MPH_TO_MPS) {
-      if (T.length > 200 && Math.abs(V[V.length - 1] - V[V.length - 200]) < 0.5) break;
+    // Only allow early termination if we've reached at least 35 seconds
+    if (t >= 35 && a < 0.01 && v > 60 * MPH_TO_MPS) {
+      if (T.length > 200 && Math.abs(V[V.length - 1] - V[V.length - 200]) < 0.1) break;
     }
   }
   return { T, V, A, S, G, shiftMarkers };
@@ -1139,25 +1141,90 @@ function populateShiftRpmDropdown() {
   sel.value = 'optimal';
 }
 
-function getPlotBounds() {
-  const all_hp = Object.values(hp_data_sets);
-  const fd_ratios = [48/13, 48/14, 50/13, 50/14];
-  for (const gr of Object.values(gear_ratios)) {
-    for (const hpArr of all_hp) {
-      const rpmArrRaw = hpArr.map(([r, hp]) => r);
-      const hpArrRaw = hpArr.map(([r, hp]) => hp);
-      for (const fd of fd_ratios) {
-        for (let i = 0; i < rpmArrRaw.length; i++) {
-          const rpm = rpmArrRaw[i], hp = hpArrRaw[i];
-          const speed = rpmToSpeed(rpm, gr, fd);
-          const tq    = (hp * 5252 / rpm) * (primary_drive * gr * fd);
-          if (speed > maxX) maxX = speed;
-          if (tq    > maxY) maxY = tq;
-        }
+// Fixed axis bounds calculated once using max HP data and extreme sprocket combo
+const FIXED_AXIS_BOUNDS = (() => {
+  // Find max HP across all datasets
+  let maxHpValue = 0;
+  let maxHpDataset = null;
+  Object.entries(hp_data_sets).forEach(([key, data]) => {
+    data.forEach(([rpm, hp]) => {
+      if (hp > maxHpValue) {
+        maxHpValue = hp;
+        maxHpDataset = key;
       }
+    });
+  });
+  
+  // Use extreme sprocket combination (smallest front, largest rear) for accel sim
+  const minFront = 12, maxRear = 53;
+  const extremeFinalDrive = maxRear / minFront;
+  
+  // Use sprocket combination for wheel torque bounds that gives ~800 ft-lbs (13/50)
+  const wheelTorqueFinalDrive = 50 / 13;
+  
+  // Get the max HP dataset
+  const maxHpData = hp_data_sets[maxHpDataset];
+  const rpmArrRaw = maxHpData.map(([r, hp]) => r);
+  const hpArrRaw = maxHpData.map(([r, hp]) => hp);
+  
+  let maxWheelSpeed = 0, maxWheelTorque = 0, maxDynoHP = 0, maxDynoTorque = 0;
+  
+  // Calculate bounds for wheel torque graph using sprocket combo for ~800 ft-lbs
+  for (const gear of Object.values(gear_ratios)) {
+    for (let i = 0; i < rpmArrRaw.length; i++) {
+      const rpm = rpmArrRaw[i], hp = hpArrRaw[i];
+      const speed = rpmToSpeed(rpm, gear, wheelTorqueFinalDrive);
+      const wheelTq = (hp * 5252 / rpm) * (primary_drive * gear * wheelTorqueFinalDrive);
+      const engineTq = (hp * 5252) / rpm;
+      
+      if (speed > maxWheelSpeed) maxWheelSpeed = speed;
+      if (wheelTq > maxWheelTorque) maxWheelTorque = wheelTq;
+      if (hp > maxDynoHP) maxDynoHP = hp;
+      if (engineTq > maxDynoTorque) maxDynoTorque = engineTq;
     }
   }
-  maxY = Math.ceil(maxY / 100) * 100;
+  
+  // Calculate accel bounds using worst case scenario (max weight, max HP)
+  const maxWeightLb = 1000; // Max from weight input
+  const maxShiftTime = 300; // Max from shift time input
+  const rpmDenseMax = rpmDense;
+  const hpDenseMax = hpDenseSets[maxHpDataset];
+  
+  // Run accel sim with extreme parameters
+  const accelSim = simulateAccel(hpDenseMax, rpmDenseMax, extremeFinalDrive, 0.02, maxWeightLb, maxShiftTime);
+  const maxAccelTime = Math.max(...accelSim.T);
+  const maxAccelSpeed = Math.max(...accelSim.V);
+  const maxAccelDistance = Math.max(...accelSim.S);
+  const maxAccelG = Math.max(...accelSim.A) / g_mps2;
+  
+  // Use full simulation distance to ensure Y-axis shows all data beyond 35 seconds
+  const effectiveMaxDistance = maxAccelDistance;
+  
+  return {
+    // Convert to user units on demand
+    wheel: {
+      maxSpeed: Math.max(160, Math.ceil(maxWheelSpeed * 1.1 / 10) * 10), // At least 160 MPH for speed axis
+      maxTorque: Math.ceil(maxWheelTorque * 1.05 / 100) * 100 // Reduced margin from 10% to 5%
+    },
+    dyno: {
+      maxHP: Math.ceil(maxDynoHP * 1.1 / 10) * 10,
+      maxTorque: Math.ceil(maxDynoTorque * 1.1 / 10) * 10,
+      minRPM: rpmArrRaw[0],
+      maxRPM: rpmArrRaw[rpmArrRaw.length - 1]
+    },
+    accel: {
+      maxTime: Math.max(35, Math.ceil(maxAccelTime * 1.1)), // At least 35 seconds
+      maxSpeed: Math.max(160, Math.ceil(maxAccelSpeed * 1.1 / 10) * 10), // At least 160 MPH
+      maxDistance: Math.ceil(effectiveMaxDistance * 2.0 / 100) * 100, // Use full distance with 100% extra margin to ensure visibility at 35s
+      maxG: 1.0 // Always 1G max for G-force charts
+    }
+  };
+})();
+
+function getPlotBounds() {
+  // Legacy function - bounds are now pre-calculated in FIXED_AXIS_BOUNDS
+  maxX = FIXED_AXIS_BOUNDS.wheel.maxSpeed;
+  maxY = FIXED_AXIS_BOUNDS.wheel.maxTorque;
 }
 
 function freezeCurrentTraces() {
@@ -1246,8 +1313,11 @@ function plotTorque(animate = true) {
       { x:[null], y:[null], mode:'lines', name:`Max ${userPreferences.torque}: ${maxTQ.toFixed(1)}`, showlegend:true, hoverinfo:'skip', line:{ color:currentColor, shape:'spline', width:2 } }
     ];
     const viewTitle = document.getElementById('viewSelect').options[document.getElementById('viewSelect').selectedIndex].text;
-    const dynoYMax = Math.ceil(Math.max(maxHP, maxTQ) * 1.1 / 10) * 10;
-    const dynoLayout = { title: viewTitle, xaxis:{ title:'RPM', color:'white', autorange:false, range:[rpmArrRaw[0], rpmArrRaw[rpmArrRaw.length-1] + 2000] }, yaxis:{ title:`${UnitConverter.getPowerLabel(userPreferences.power)} / ${UnitConverter.getTorqueLabel(userPreferences.torque)}`, color:'white', autorange:false, range:[0, dynoYMax] }, plot_bgcolor:'#111', paper_bgcolor:'#111', font:{ color:'white' }, transition:{ duration:1000, easing:'cubic-in-out' }, hovermode:'closest', hoverdistance:10 };
+    // Use fixed bounds for dyno chart
+    const dynoMaxHP = UnitConverter.convertPower(FIXED_AXIS_BOUNDS.dyno.maxHP, userPreferences.power);
+    const dynoMaxTorque = UnitConverter.convertTorque(FIXED_AXIS_BOUNDS.dyno.maxTorque, userPreferences.torque);
+    const dynoYMax = Math.max(dynoMaxHP, dynoMaxTorque);
+    const dynoLayout = { title: viewTitle, xaxis:{ title:'RPM', color:'white', autorange:false, range:[FIXED_AXIS_BOUNDS.dyno.minRPM, FIXED_AXIS_BOUNDS.dyno.maxRPM + 2000] }, yaxis:{ title:`${UnitConverter.getPowerLabel(userPreferences.power)} / ${UnitConverter.getTorqueLabel(userPreferences.torque)}`, color:'white', autorange:false, range:[0, dynoYMax] }, plot_bgcolor:'#111', paper_bgcolor:'#111', font:{ color:'white' }, transition:{ duration:1000, easing:'cubic-in-out' }, hovermode:'closest', hoverdistance:10 };
     const allDynoTraces = [...dynoTraces, ...legendTraces, ...frozenTraces];
     if (animate) Plotly.react('plot', allDynoTraces, dynoLayout, {responsive:true});
     else { const staticLayout = { ...dynoLayout }; delete staticLayout.transition; Plotly.newPlot('plot', allDynoTraces, staticLayout, {responsive:true}); }
@@ -1261,11 +1331,14 @@ function plotTorque(animate = true) {
     
     // Convert speed data to user's preferred units
     const speedConverted = sim.V.map(mph => UnitConverter.convertSpeed(mph, userPreferences.speed));
-    const speedMax = Math.ceil(Math.max(...speedConverted) * 1.1 / 10) * 10;
     
     // Convert distance data based on speed unit preference
     const distanceUnit = UnitConverter.getDistanceUnit(userPreferences.speed);
     const distanceConverted = sim.S.map(ft => UnitConverter.convertDistance(ft, distanceUnit));
+    
+    // Use fixed bounds for all acceleration charts
+    const accelMaxSpeed = UnitConverter.convertSpeed(FIXED_AXIS_BOUNDS.accel.maxSpeed, userPreferences.speed);
+    const accelMaxDistance = UnitConverter.convertDistance(FIXED_AXIS_BOUNDS.accel.maxDistance, distanceUnit);
     
     if (view === 'accel_ts') { 
       xData = sim.T; 
@@ -1322,10 +1395,30 @@ function plotTorque(animate = true) {
     }
 
     const viewTitle = document.getElementById('viewSelect').options[document.getElementById('viewSelect').selectedIndex].text;
+    
+    // Set fixed axis ranges based on chart type
+    let xRange, yRange;
+    if (view === 'accel_ts') {
+      xRange = [0, FIXED_AXIS_BOUNDS.accel.maxTime];
+      yRange = [0, accelMaxSpeed];
+    } else if (view === 'accel_td') {
+      xRange = [0, FIXED_AXIS_BOUNDS.accel.maxTime];
+      yRange = [0, accelMaxDistance];
+    } else if (view === 'accel_tg') {
+      xRange = [0, FIXED_AXIS_BOUNDS.accel.maxTime];
+      yRange = [0, FIXED_AXIS_BOUNDS.accel.maxG];
+    } else if (view === 'accel_sg') {
+      xRange = [0, accelMaxSpeed];
+      yRange = [0, FIXED_AXIS_BOUNDS.accel.maxG];
+    } else {
+      xRange = [0, FIXED_AXIS_BOUNDS.accel.maxTime];
+      yRange = [0, accelMaxSpeed];
+    }
+    
     const layout = {
       title: viewTitle,
-      xaxis: lockX ? { title:xTitle, color:'white', range:[0,30] } : { title:xTitle, color:'white' },
-      yaxis: lockY ? { title:yTitle, color:'white', range:[0,speedMax || 150] } : { title:yTitle, color:'white' },
+      xaxis: { title:xTitle, color:'white', range:xRange },
+      yaxis: { title:yTitle, color:'white', range:yRange },
       plot_bgcolor:'#111', paper_bgcolor:'#111', font:{ color:'white' },
       hovermode:'closest', hoverdistance:10, transition:{ duration:1000, easing:'cubic-in-out' }
     };
@@ -1375,9 +1468,10 @@ function plotTorque(animate = true) {
   }
 
   const connectorTraces = [];
-  // Calculate converted max values for layout
-  const maxXConverted = UnitConverter.convertSpeed(maxX, userPreferences.speed);
-  const maxYConverted = UnitConverter.convertTorque(maxY, userPreferences.torque);
+  // Use fixed axis bounds for wheel torque chart - ensure at least 160 MPH equivalent
+  const wheelMaxSpeedMPH = Math.max(160, FIXED_AXIS_BOUNDS.wheel.maxSpeed);
+  const maxXConverted = UnitConverter.convertSpeed(wheelMaxSpeedMPH, userPreferences.speed);
+  const maxYConverted = UnitConverter.convertTorque(FIXED_AXIS_BOUNDS.wheel.maxTorque, userPreferences.torque);
   
   for (let g = 1; g <= 5; g++) {
     const xShift = shift_speed[g];
