@@ -880,13 +880,18 @@ function regenerateFrozenTraces() {
       frozenTraces.push({ x:[null], y:[null], mode:'lines', name:`(F${front}/R${rear} ${hpKey})`, showlegend:true, hoverinfo:'skip', line:{color:lineColor, width:2, shape:'spline'} });
       frozenTraces.push({ x:[null], y:[null], mode:'lines', name:`Weight: ${Math.round(displayWeight)} ${weightUnit}`, showlegend:true, hoverinfo:'skip', line:{color:lineColor, width:2, shape:'spline'} });
       frozenTraces.push({ x:[null], y:[null], mode:'lines', name:`Shift Time: ${shiftMs} ms`, showlegend:true, hoverinfo:'skip', line:{color:lineColor, width:2, shape:'spline'} });
-      // Create proper hover template for frozen traces
-      let hoverTemplate;
+      // Create proper hover template for frozen traces with additional data
+      let hoverTemplate, customData;
       if (currentView === 'accel_ts') {
-        hoverTemplate = `Time: %{x:.2f}s<br>Speed: %{y:.1f} ${userPreferences.speed}<extra></extra>`;
-      } else if (currentView === 'accel_td') {
+        // Time vs Speed - add distance info
+        customData = distanceConverted;
         const distanceUnit = UnitConverter.getDistanceUnit(userPreferences.speed);
-        hoverTemplate = `Time: %{x:.2f}s<br>Distance: %{y:.0f} ${distanceUnit}<extra></extra>`;
+        hoverTemplate = `Time: %{x:.2f}s<br>Speed: %{y:.1f} ${userPreferences.speed}<br>Distance: %{customdata:.0f} ${distanceUnit}<extra></extra>`;
+      } else if (currentView === 'accel_td') {
+        // Time vs Distance - add speed info
+        customData = speedConverted;
+        const distanceUnit = UnitConverter.getDistanceUnit(userPreferences.speed);
+        hoverTemplate = `Time: %{x:.2f}s<br>Distance: %{y:.0f} ${distanceUnit}<br>Speed: %{customdata:.1f} ${userPreferences.speed}<extra></extra>`;
       } else if (currentView === 'accel_tg') {
         hoverTemplate = `Time: %{x:.2f}s<br>Accel: %{y:.2f} g<extra></extra>`;
       } else if (currentView === 'accel_sg') {
@@ -895,7 +900,9 @@ function regenerateFrozenTraces() {
         hoverTemplate = `Time: %{x:.2f}s<br>Speed: %{y:.1f} ${userPreferences.speed}<extra></extra>`;
       }
       
-      frozenTraces.push({ x:xData, y:yData, mode:'lines', showlegend:false, hoverinfo:'x+y', hovertemplate: hoverTemplate, line:{ color: lineColor, width:2, shape:'spline' }, opacity:0.7 });
+      const traceData = { x:xData, y:yData, mode:'lines', showlegend:false, hoverinfo:'x+y', hovertemplate: hoverTemplate, line:{ color: lineColor, width:2, shape:'spline' }, opacity:0.7 };
+      if (customData) traceData.customdata = customData;
+      frozenTraces.push(traceData);
       
       if (showShift) {
         sim.shiftMarkers.forEach(m => {
@@ -1374,13 +1381,29 @@ function plotTorque(animate = true) {
     traces.push({ x:[null], y:[null], mode:'lines', name:`(F${front}/R${rear} ${hpKey})`, showlegend:true, hoverinfo:'skip', line:{ color: currentColor, width:2, shape:'spline' } });
     traces.push({ x:[null], y:[null], mode:'lines', name:`Weight: ${Math.round(displayWeight)} ${weightUnit}`, showlegend:true, hoverinfo:'skip', line:{ color: currentColor, width:2, shape:'spline' } });
     traces.push({ x:[null], y:[null], mode:'lines', name:`Shift Time: ${shiftMs} ms`, showlegend:true, hoverinfo:'skip', line:{ color: currentColor, width:2, shape:'spline' } });
-    traces.push({ x:xData, y:yData, mode:'lines', name:'Acceleration View', showlegend:false, hoverinfo:'x+y',
-      hovertemplate: (xTitle.startsWith('Time') ? `Time: %{x:.2f}s` : `Speed: %{x:.1f} ${userPreferences.speed}`) + '<br>' +
+    // Create enhanced hover template with additional data for main traces
+    let mainHoverTemplate, mainCustomData;
+    if (view === 'accel_ts') {
+      // Time vs Speed - add distance info
+      mainCustomData = distanceConverted;
+      mainHoverTemplate = `Time: %{x:.2f}s<br>Speed: %{y:.1f} ${userPreferences.speed}<br>Distance: %{customdata:.0f} ${distanceUnit}<extra></extra>`;
+    } else if (view === 'accel_td') {
+      // Time vs Distance - add speed info  
+      mainCustomData = speedConverted;
+      mainHoverTemplate = `Time: %{x:.2f}s<br>Distance: %{y:.0f} ${distanceUnit}<br>Speed: %{customdata:.1f} ${userPreferences.speed}<extra></extra>`;
+    } else {
+      // Keep original hover template for other views
+      mainHoverTemplate = (xTitle.startsWith('Time') ? `Time: %{x:.2f}s` : `Speed: %{x:.1f} ${userPreferences.speed}`) + '<br>' +
         (yTitle.includes('Speed') ? `Speed: %{y:.1f} ${userPreferences.speed}` : 
          yTitle.includes('Distance') ? `Distance: %{y:.0f} ${yTitle.includes('(m)') ? 'm' : 'ft'}` : 
          `Accel: %{y:.2f} g`) +
-        '<extra></extra>',
-      line:{ color: currentColor, width:2, shape:'spline' } });
+        '<extra></extra>';
+    }
+
+    const mainTrace = { x:xData, y:yData, mode:'lines', name:'Acceleration View', showlegend:false, hoverinfo:'x+y',
+      hovertemplate: mainHoverTemplate, line:{ color: currentColor, width:2, shape:'spline' } };
+    if (mainCustomData) mainTrace.customdata = mainCustomData;
+    traces.push(mainTrace);
 
     const connectorTraces = [];
     if (showShift) {
