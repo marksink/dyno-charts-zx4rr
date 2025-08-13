@@ -42,15 +42,16 @@
       align-items: center;
       gap: 8px;
       margin-bottom: 15px;
-      padding: 12px 8px;
+      padding: 12px 8px 12px 8px;
       background: rgba(255,255,255,0.05);
       border-radius: 12px;
       backdrop-filter: blur(10px);
       border: 1px solid rgba(255,255,255,0.1);
       width: calc(100% - 20px);
-      margin: 0 auto 15px auto;
-      overflow-x: auto;
+      margin: 0 auto 25px auto;
+      overflow: visible;
       min-width: 0;
+      position: relative;
     }
     
     .button-row {
@@ -325,6 +326,87 @@
       background: rgba(255,255,255,0.15);
       box-shadow: 0 4px 12px rgba(0,0,0,0.3);
     }
+    
+    /* Custom Shift RPM Dropdown Styles */
+    .custom-shift-dropdown {
+      position: relative;
+      display: inline-block;
+      z-index: 1000;
+    }
+    
+    .shift-rpm-display {
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.2);
+      color: #e8e8e8;
+      padding: 6px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      min-width: 60px;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      transition: all 0.3s ease;
+    }
+    
+    .shift-rpm-display:hover {
+      background: rgba(255,255,255,0.12);
+      border-color: rgba(255,255,255,0.3);
+    }
+    
+    .dropdown-arrow {
+      font-size: 10px;
+      margin-left: 8px;
+      transition: transform 0.3s ease;
+    }
+    
+    .shift-rpm-options {
+      position: absolute;
+      top: calc(100% + 2px);
+      left: 0;
+      min-width: 120px;
+      width: max-content;
+      background: rgba(42,42,42,0.98);
+      border: 1px solid rgba(255,255,255,0.3);
+      border-radius: 6px;
+      z-index: 99999;
+      backdrop-filter: blur(15px);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+    }
+    
+    .shift-option {
+      padding: 8px 12px;
+      cursor: pointer;
+      font-size: 12px;
+      color: #e8e8e8;
+      transition: background 0.3s ease;
+    }
+    
+    .shift-option:hover {
+      background: rgba(255,255,255,0.1);
+    }
+    
+    .shift-option.custom-input {
+      padding: 6px;
+    }
+    
+    .shift-option.custom-input input {
+      width: calc(100% - 16px);
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.2);
+      color: #e8e8e8;
+      padding: 6px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      box-sizing: border-box;
+    }
+    
+    .shift-option.custom-input input:focus {
+      outline: none;
+      background: rgba(255,255,255,0.15);
+      border-color: #4a9eff;
+      box-shadow: 0 0 0 1px rgba(74,158,255,0.3);
+    }
   </style>
 </head>
 <body>
@@ -379,29 +461,12 @@
 
     <div class="control-group">
       <label for="front">F-Sprocket:</label>
-      <select id="front" onchange="plotTorque(true)">
-        <option value="12">12</option>
-        <option value="13">13</option>
-        <option value="14" selected>14</option>
-        <option value="15">15</option>
-      </select>
+      <input id="front" type="number" value="14" min="10" max="20" step="1" onchange="plotTorque(true)">
     </div>
 
     <div class="control-group">
       <label for="rear">R-Sprocket:</label>
-      <select id="rear" onchange="plotTorque(true)">
-        <option value="43">43</option>
-        <option value="44">44</option>
-        <option value="45">45</option>
-        <option value="46">46</option>
-        <option value="47">47</option>
-        <option value="48" selected>48</option>
-        <option value="49">49</option>
-        <option value="50">50</option>
-        <option value="51">51</option>
-        <option value="52">52</option>
-        <option value="53">53</option>
-      </select>
+      <input id="rear" type="number" value="48" min="35" max="60" step="1" onchange="plotTorque(true)">
     </div>
 
     <div class="control-group">
@@ -423,7 +488,22 @@
 
     <div class="control-group">
       <label for="shiftRpmSelect">Shift RPM:</label>
-      <select id="shiftRpmSelect" onchange="plotTorque(true)"></select>
+      <div class="custom-shift-dropdown">
+        <select id="shiftRpmSelect" onchange="handleShiftRpmChange()" style="display: none;">
+          <option value="optimal">Optimal</option>
+          <option value="custom">Custom</option>
+        </select>
+        <div class="shift-rpm-display" onclick="toggleShiftRpmDropdown()">
+          <span id="shiftRpmDisplayText">Optimal</span>
+          <span class="dropdown-arrow">▼</span>
+        </div>
+        <div id="shiftRpmOptions" class="shift-rpm-options" style="display: none;">
+          <div class="shift-option" onclick="selectShiftRpm('optimal')">Optimal</div>
+          <div class="shift-option custom-input">
+            <input type="number" id="customShiftRpm" placeholder="Enter RPM" min="3400" max="16000" step="100" onkeypress="handleCustomRpmKeypress(event)" onblur="handleCustomRpmBlur()">
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Accel-only controls -->
@@ -900,7 +980,9 @@ function regenerateFrozenTraces() {
         hoverTemplate = `Time: %{x:.2f}s<br>Speed: %{y:.1f} ${userPreferences.speed}<extra></extra>`;
       }
       
-      const traceData = { x:xData, y:yData, mode:'lines', showlegend:false, hoverinfo:'x+y', hovertemplate: hoverTemplate, line:{ color: lineColor, width:2, shape:'spline' }, opacity:0.7 };
+      // Don't smooth G-force graphs
+      const lineShape = (currentView === 'accel_tg' || currentView === 'accel_sg') ? 'linear' : 'spline';
+      const traceData = { x:xData, y:yData, mode:'lines', showlegend:false, hoverinfo:'x+y', hovertemplate: hoverTemplate, line:{ color: lineColor, width:2, shape: lineShape }, opacity:0.7 };
       if (customData) traceData.customdata = customData;
       frozenTraces.push(traceData);
       
@@ -988,6 +1070,22 @@ function toggleControlVisibility() {
   setTimeout(() => adjustLayout(), 50);
 }
 
+// Helper function to get current shift RPM setting
+function getCurrentShiftRpmSetting() {
+  const hiddenSelect = document.getElementById('shiftRpmSelect');
+  if (!hiddenSelect) return 'optimal';
+  
+  const value = hiddenSelect.value;
+  
+  // If it's a number, return it as-is (custom RPM)
+  if (value && !isNaN(parseFloat(value)) && value !== 'optimal' && value !== 'custom') {
+    return parseFloat(value);
+  }
+  
+  // Otherwise return 'optimal'
+  return 'optimal';
+}
+
 // Shift points calc - with optional shift RPM override
 function computeShiftPoints(hpArr, final_drive, rpmArr, shiftRpmOverride = null) {
   const wt = {}, spd = {};
@@ -996,13 +1094,13 @@ function computeShiftPoints(hpArr, final_drive, rpmArr, shiftRpmOverride = null)
     spd[g] = rpmArr.map(rpm => rpmToSpeed(rpm, gear_ratios[g], final_drive));
   }
   
-  const shiftRpmSetting = shiftRpmOverride || (document.getElementById('shiftRpmSelect')?.value) || 'optimal';
+  const shiftRpmSetting = shiftRpmOverride !== null ? shiftRpmOverride : getCurrentShiftRpmSetting();
   const shift_rpm = {}, shift_speed = {};
   
   for (let g = 1; g <= 5; g++) {
     let shiftRPM;
     
-    if (shiftRpmSetting === 'optimal') {
+    if (shiftRpmSetting === 'optimal' || isNaN(shiftRpmSetting)) {
       // Original optimal shift point calculation
       const ratio  = gear_ratios[g + 1] / gear_ratios[g];
       const diff   = [];
@@ -1017,14 +1115,24 @@ function computeShiftPoints(hpArr, final_drive, rpmArr, shiftRpmOverride = null)
       else if (idx === 0) shiftRPM = rpmArr[0];
       else shiftRPM = lerp(rpmArr[idx - 1], diff[idx - 1], rpmArr[idx], diff[idx], 0);
     } else {
-      // Use fixed RPM from dropdown
+      // Use custom RPM value
       shiftRPM = parseFloat(shiftRpmSetting);
       // Clamp to valid RPM range
       shiftRPM = Math.max(rpmArr[0], Math.min(rpmArr[rpmArr.length - 1], shiftRPM));
     }
     
+    // Ensure shift RPM is valid
+    if (isNaN(shiftRPM)) {
+      shiftRPM = rpmArr[rpmArr.length - 1]; // Fallback to max RPM
+    }
+    
     shift_rpm[g]   = shiftRPM;
     shift_speed[g] = rpmToSpeed(shiftRPM, gear_ratios[g], final_drive);
+    
+    // Ensure shift speed is valid
+    if (isNaN(shift_speed[g])) {
+      shift_speed[g] = rpmToSpeed(rpmArr[rpmArr.length - 1], gear_ratios[g], final_drive);
+    }
   }
   return { wt, spd, shift_rpm, shift_speed };
 }
@@ -1127,26 +1235,123 @@ function populateShiftRpmDropdown() {
   const optimalOpt = document.createElement('option');
   optimalOpt.value = 'optimal'; optimalOpt.textContent = 'Optimal'; sel.appendChild(optimalOpt);
   
-  // Get all distinct RPM values from hp_data_sets
-  const rpmSet = new Set();
-  Object.values(hp_data_sets).forEach(dataArray => {
-    dataArray.forEach(([rpm, hp]) => {
-      rpmSet.add(rpm);
-    });
-  });
-  
-  // Convert to sorted array (descending)
-  const distinctRpms = Array.from(rpmSet).sort((a, b) => b - a);
-  
-  // Add RPM options
-  distinctRpms.forEach(rpm => {
-    const opt = document.createElement('option');
-    opt.value = rpm; opt.textContent = `${rpm} RPM`; sel.appendChild(opt);
-  });
+  // Add 'Custom' option
+  const customOpt = document.createElement('option');
+  customOpt.value = 'custom'; customOpt.textContent = 'Custom'; sel.appendChild(customOpt);
   
   // Set default to 'Optimal'
   sel.value = 'optimal';
+  
+  // Make sure display shows 'Optimal'
+  const displayText = document.getElementById('shiftRpmDisplayText');
+  if (displayText) {
+    displayText.textContent = 'Optimal';
+  }
 }
+
+// Custom shift RPM dropdown functions
+function toggleShiftRpmDropdown() {
+  const options = document.getElementById('shiftRpmOptions');
+  const arrow = document.querySelector('.dropdown-arrow');
+  const isVisible = options.style.display !== 'none';
+  
+  if (isVisible) {
+    options.style.display = 'none';
+    arrow.style.transform = 'rotate(0deg)';
+  } else {
+    options.style.display = 'block';
+    arrow.style.transform = 'rotate(180deg)';
+    // Focus the input if it exists
+    const customInput = document.getElementById('customShiftRpm');
+    if (customInput) {
+      setTimeout(() => customInput.focus(), 100);
+    }
+  }
+}
+
+function selectShiftRpm(value) {
+  const displayText = document.getElementById('shiftRpmDisplayText');
+  const hiddenSelect = document.getElementById('shiftRpmSelect');
+  const options = document.getElementById('shiftRpmOptions');
+  const arrow = document.querySelector('.dropdown-arrow');
+  
+  if (value === 'optimal') {
+    displayText.textContent = 'Optimal';
+    hiddenSelect.value = 'optimal';
+  }
+  
+  // Close dropdown
+  options.style.display = 'none';
+  arrow.style.transform = 'rotate(0deg)';
+  
+  // Trigger plot update
+  plotTorque(true);
+}
+
+function handleCustomRpmKeypress(event) {
+  if (event.key === 'Enter') {
+    const input = event.target;
+    const value = parseInt(input.value);
+    
+    if (value && value >= 3400 && value <= 16000) {
+      const displayText = document.getElementById('shiftRpmDisplayText');
+      const hiddenSelect = document.getElementById('shiftRpmSelect');
+      const options = document.getElementById('shiftRpmOptions');
+      const arrow = document.querySelector('.dropdown-arrow');
+      
+      // Add the custom RPM as an option to the hidden select
+      const existingCustom = hiddenSelect.querySelector(`option[value="${value}"]`);
+      if (!existingCustom) {
+        const customOption = document.createElement('option');
+        customOption.value = value;
+        customOption.textContent = `${value} RPM`;
+        hiddenSelect.appendChild(customOption);
+      }
+      
+      displayText.textContent = `${value} RPM`;
+      hiddenSelect.value = value;
+      
+      // Close dropdown
+      options.style.display = 'none';
+      arrow.style.transform = 'rotate(0deg)';
+      
+      // Clear the input for next time
+      input.value = '';
+      
+      // Trigger plot update
+      plotTorque(true);
+    } else {
+      alert('Please enter an RPM value between 3400 and 16000');
+    }
+  }
+}
+
+function handleCustomRpmBlur() {
+  // Close dropdown when input loses focus
+  setTimeout(() => {
+    const options = document.getElementById('shiftRpmOptions');
+    const arrow = document.querySelector('.dropdown-arrow');
+    options.style.display = 'none';
+    arrow.style.transform = 'rotate(0deg)';
+  }, 200);
+}
+
+function handleShiftRpmChange() {
+  // This function handles the hidden select changes
+  plotTorque(true);
+}
+
+// Close dropdown when clicking outside
+document.addEventListener('click', function(event) {
+  const dropdown = document.querySelector('.custom-shift-dropdown');
+  const options = document.getElementById('shiftRpmOptions');
+  const arrow = document.querySelector('.dropdown-arrow');
+  
+  if (dropdown && !dropdown.contains(event.target)) {
+    if (options) options.style.display = 'none';
+    if (arrow) arrow.style.transform = 'rotate(0deg)';
+  }
+});
 
 // Fixed axis bounds calculated once using max HP data and extreme sprocket combo
 const FIXED_AXIS_BOUNDS = (() => {
@@ -1241,7 +1446,7 @@ function freezeCurrentTraces() {
   const hpKey = document.getElementById('hpData').value;
   const weightLb = getMassLb();
   const shiftMs = getShiftMs();
-  const shiftRpmSetting = document.getElementById('shiftRpmSelect').value;
+  const shiftRpmSetting = getCurrentShiftRpmSetting();
   
   // Add configuration to frozen configurations array
   frozenConfigurations.push({ front, rear, hpKey, weightLb, shiftMs, shiftRpmSetting });
@@ -1259,6 +1464,7 @@ function clearFrozenTraces() {
   document.getElementById("rear").value = "48";
   document.getElementById("hpData").value = "Stock";
   document.getElementById("shiftRpmSelect").value = "optimal";
+  document.getElementById("shiftRpmDisplayText").textContent = "Optimal";
   document.getElementById("truncateCross").checked = false;
   frozenConfigurations = []; frozenTraces = []; freezeCount = 0; frozenConnectorTraces = [];
   plotTorque();
@@ -1400,8 +1606,10 @@ function plotTorque(animate = true) {
         '<extra></extra>';
     }
 
+    // Don't smooth G-force graphs
+    const mainLineShape = (view === 'accel_tg' || view === 'accel_sg') ? 'linear' : 'spline';
     const mainTrace = { x:xData, y:yData, mode:'lines', name:'Acceleration View', showlegend:false, hoverinfo:'x+y',
-      hovertemplate: mainHoverTemplate, line:{ color: currentColor, width:2, shape:'spline' } };
+      hovertemplate: mainHoverTemplate, line:{ color: currentColor, width:2, shape: mainLineShape } };
     if (mainCustomData) mainTrace.customdata = mainCustomData;
     traces.push(mainTrace);
 
