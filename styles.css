@@ -1,0 +1,421 @@
+body { 
+  background: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%); 
+  color: #e8e8e8; 
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+  margin: 0; 
+  padding: 10px;
+  min-height: 100vh;
+  box-sizing: border-box;
+  overflow-x: hidden;
+}
+
+h1 {
+  text-align: center;
+  color: #ffffff;
+  font-weight: 300;
+  font-size: 2.2em;
+  margin: 10px 0 20px 0;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+}
+
+#plot { 
+  width: 98%; 
+  max-width: calc(100vh - 200px); 
+  aspect-ratio: 16 / 9; 
+  max-height: calc(100vh - 200px); 
+  margin: auto;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+}
+
+.controls { 
+  display: flex;
+  flex-wrap: nowrap;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 15px;
+  padding: 12px 8px 12px 8px;
+  background: rgba(255,255,255,0.05);
+  border-radius: 12px;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255,255,255,0.1);
+  width: calc(100% - 20px);
+  margin: 0 auto 25px auto;
+  overflow: visible;
+  min-width: 0;
+  position: relative;
+}
+
+.button-row {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+label { 
+  user-select: none;
+  font-weight: 500;
+  color: #d0d0d0;
+  font-size: 12px;
+  white-space: nowrap;
+  margin-right: 4px;
+}
+
+select, input[type="number"] {
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.2);
+  color: #e8e8e8;
+  padding: 6px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  min-width: 60px;
+  width: auto;
+  transition: all 0.3s ease;
+}
+
+/* Make sprocket inputs more compact */
+#front, #rear {
+  min-width: 45px;
+  width: 45px;
+  padding: 6px 4px;
+}
+
+select:hover, input[type="number"]:hover {
+  background: rgba(255,255,255,0.12);
+  border-color: rgba(255,255,255,0.3);
+}
+
+select:focus, input[type="number"]:focus {
+  outline: none;
+  background: rgba(255,255,255,0.15);
+  border-color: #4a9eff;
+  box-shadow: 0 0 0 2px rgba(74,158,255,0.2);
+}
+
+select option {
+  background: #2a2a2a;
+  color: #e8e8e8;
+}
+
+button {
+  background: linear-gradient(145deg, #4a9eff 0%, #357abd 100%);
+  border: none;
+  color: white;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 3px 8px rgba(74,158,255,0.3);
+  min-width: 70px;
+}
+
+button:hover {
+  background: linear-gradient(145deg, #5ba3ff 0%, #3d82c7 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(74,158,255,0.4);
+}
+
+button:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 6px rgba(74,158,255,0.3);
+}
+
+input[type="checkbox"] {
+  margin-right: 4px;
+  accent-color: #4a9eff;
+  transform: scale(1.1);
+}
+
+.control-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+@media (max-width: 1400px) {
+  .controls {
+    gap: 6px;
+    padding: 10px 6px;
+  }
+  
+  label {
+    font-size: 11px;
+  }
+  
+  select, input[type="number"] {
+    font-size: 11px;
+    padding: 5px 6px;
+    min-width: 50px;
+  }
+  
+  #front, #rear {
+    min-width: 40px;
+    width: 40px;
+    padding: 5px 3px;
+  }
+}
+
+@media (max-width: 1200px) {
+  .controls {
+    gap: 4px;
+    padding: 8px 4px;
+  }
+  
+  label {
+    font-size: 10px;
+  }
+  
+  select, input[type="number"] {
+    font-size: 10px;
+    padding: 4px 5px;
+    min-width: 45px;
+  }
+  
+  #front, #rear {
+    min-width: 35px;
+    width: 35px;
+    padding: 4px 2px;
+  }
+  
+  .control-group {
+    gap: 3px;
+  }
+}
+
+@media (max-width: 768px) {
+  .controls {
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 12px;
+  }
+  
+  .control-group {
+    flex-shrink: 1;
+  }
+  
+  h1 {
+    font-size: 1.8em;
+  }
+  
+  #plot {
+    max-height: calc(100vh - 250px);
+  }
+}
+
+/* Settings Icon and Panel Styles */
+.settings-icon {
+  font-size: 18px;
+  cursor: pointer;
+  color: #4a9eff;
+  transition: color 0.3s ease, transform 0.2s ease;
+  display: flex;
+  align-items: center;
+  padding: 4px;
+}
+
+.settings-icon:hover {
+  color: #5ba3ff;
+  transform: rotate(90deg);
+}
+
+.settings-panel {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.8);
+  display: none;
+  z-index: 9999;
+  backdrop-filter: blur(5px);
+}
+
+.settings-content {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: linear-gradient(135deg, #2a2a2a 0%, #1a1a1a 100%);
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 12px;
+  padding: 24px;
+  min-width: 300px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+}
+
+.settings-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.settings-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.settings-close {
+  font-size: 24px;
+  cursor: pointer;
+  color: #999;
+  transition: color 0.3s ease;
+}
+
+.settings-close:hover {
+  color: #fff;
+}
+
+.settings-group {
+  margin-bottom: 16px;
+}
+
+.settings-group label {
+  display: block;
+  margin-bottom: 6px;
+  font-weight: 500;
+  color: #d0d0d0;
+  font-size: 14px;
+}
+
+.settings-group select {
+  width: 100%;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.2);
+  color: #e8e8e8;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 14px;
+  transition: all 0.3s ease;
+}
+
+.settings-group select:focus {
+  outline: none;
+  background: rgba(255,255,255,0.15);
+  border-color: #4a9eff;
+  box-shadow: 0 0 0 2px rgba(74,158,255,0.2);
+}
+
+.settings-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.settings-btn {
+  background: linear-gradient(145deg, #4a9eff 0%, #357abd 100%);
+  border: none;
+  color: white;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 3px 8px rgba(74,158,255,0.3);
+}
+
+.settings-btn:hover {
+  background: linear-gradient(145deg, #5ba3ff 0%, #3d82c7 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(74,158,255,0.4);
+}
+
+.settings-btn.secondary {
+  background: rgba(255,255,255,0.1);
+  box-shadow: 0 3px 8px rgba(0,0,0,0.2);
+}
+
+.settings-btn.secondary:hover {
+  background: rgba(255,255,255,0.15);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+
+/* Custom Shift RPM Dropdown Styles */
+.custom-shift-dropdown {
+  position: relative;
+  display: inline-block;
+  z-index: 1000;
+}
+
+.shift-rpm-display {
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.2);
+  color: #e8e8e8;
+  padding: 6px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  min-width: 60px;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  transition: all 0.3s ease;
+}
+
+.shift-rpm-display:hover {
+  background: rgba(255,255,255,0.12);
+  border-color: rgba(255,255,255,0.3);
+}
+
+.dropdown-arrow {
+  font-size: 10px;
+  margin-left: 8px;
+  transition: transform 0.3s ease;
+}
+
+.shift-rpm-options {
+  position: absolute;
+  top: calc(100% + 2px);
+  left: 0;
+  min-width: 120px;
+  width: max-content;
+  background: rgba(42,42,42,0.98);
+  border: 1px solid rgba(255,255,255,0.3);
+  border-radius: 6px;
+  z-index: 99999;
+  backdrop-filter: blur(15px);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+}
+
+.shift-option {
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: 12px;
+  color: #e8e8e8;
+  transition: background 0.3s ease;
+}
+
+.shift-option:hover {
+  background: rgba(255,255,255,0.1);
+}
+
+.shift-option.custom-input {
+  padding: 6px;
+}
+
+.shift-option.custom-input input {
+  width: calc(100% - 16px);
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.2);
+  color: #e8e8e8;
+  padding: 6px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  box-sizing: border-box;
+}
+
+.shift-option.custom-input input:focus {
+  outline: none;
+  background: rgba(255,255,255,0.15);
+  border-color: #4a9eff;
+  box-shadow: 0 0 0 1px rgba(74,158,255,0.3);
+}

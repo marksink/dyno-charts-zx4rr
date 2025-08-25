@@ -4,410 +4,7 @@
   <meta charset="UTF-8" />
   <title>ZX-4RR Dyno App</title>
   <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
-  <style>
-    body { 
-      background: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%); 
-      color: #e8e8e8; 
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-      margin: 0; 
-      padding: 10px;
-      min-height: 100vh;
-      box-sizing: border-box;
-      overflow-x: hidden;
-    }
-    
-    h1 {
-      text-align: center;
-      color: #ffffff;
-      font-weight: 300;
-      font-size: 2.2em;
-      margin: 10px 0 20px 0;
-      text-shadow: 0 2px 4px rgba(0,0,0,0.5);
-    }
-    
-    #plot { 
-      width: 98%; 
-      max-width: calc(100vh - 200px); 
-      aspect-ratio: 16 / 9; 
-      max-height: calc(100vh - 200px); 
-      margin: auto;
-      border-radius: 12px;
-      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
-    }
-    
-    .controls { 
-      display: flex;
-      flex-wrap: nowrap;
-      justify-content: center;
-      align-items: center;
-      gap: 8px;
-      margin-bottom: 15px;
-      padding: 12px 8px 12px 8px;
-      background: rgba(255,255,255,0.05);
-      border-radius: 12px;
-      backdrop-filter: blur(10px);
-      border: 1px solid rgba(255,255,255,0.1);
-      width: calc(100% - 20px);
-      margin: 0 auto 25px auto;
-      overflow: visible;
-      min-width: 0;
-      position: relative;
-    }
-    
-    .button-row {
-      display: flex;
-      justify-content: center;
-      gap: 12px;
-      margin-bottom: 20px;
-    }
-    
-    label { 
-      user-select: none;
-      font-weight: 500;
-      color: #d0d0d0;
-      font-size: 12px;
-      white-space: nowrap;
-      margin-right: 4px;
-    }
-    
-    select, input[type="number"] {
-      background: rgba(255,255,255,0.08);
-      border: 1px solid rgba(255,255,255,0.2);
-      color: #e8e8e8;
-      padding: 6px 8px;
-      border-radius: 4px;
-      font-size: 12px;
-      min-width: 60px;
-      width: auto;
-      transition: all 0.3s ease;
-    }
-    
-    select:hover, input[type="number"]:hover {
-      background: rgba(255,255,255,0.12);
-      border-color: rgba(255,255,255,0.3);
-    }
-    
-    select:focus, input[type="number"]:focus {
-      outline: none;
-      background: rgba(255,255,255,0.15);
-      border-color: #4a9eff;
-      box-shadow: 0 0 0 2px rgba(74,158,255,0.2);
-    }
-    
-    select option {
-      background: #2a2a2a;
-      color: #e8e8e8;
-    }
-    
-    button {
-      background: linear-gradient(145deg, #4a9eff 0%, #357abd 100%);
-      border: none;
-      color: white;
-      padding: 8px 16px;
-      border-radius: 6px;
-      font-size: 12px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.3s ease;
-      box-shadow: 0 3px 8px rgba(74,158,255,0.3);
-      min-width: 70px;
-    }
-    
-    button:hover {
-      background: linear-gradient(145deg, #5ba3ff 0%, #3d82c7 100%);
-      transform: translateY(-1px);
-      box-shadow: 0 4px 12px rgba(74,158,255,0.4);
-    }
-    
-    button:active {
-      transform: translateY(0);
-      box-shadow: 0 2px 6px rgba(74,158,255,0.3);
-    }
-    
-    input[type="checkbox"] {
-      margin-right: 4px;
-      accent-color: #4a9eff;
-      transform: scale(1.1);
-    }
-    
-    .control-group {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      flex-shrink: 0;
-      white-space: nowrap;
-    }
-    
-    @media (max-width: 1400px) {
-      .controls {
-        gap: 6px;
-        padding: 10px 6px;
-      }
-      
-      label {
-        font-size: 11px;
-      }
-      
-      select, input[type="number"] {
-        font-size: 11px;
-        padding: 5px 6px;
-        min-width: 50px;
-      }
-    }
-    
-    @media (max-width: 1200px) {
-      .controls {
-        gap: 4px;
-        padding: 8px 4px;
-      }
-      
-      label {
-        font-size: 10px;
-      }
-      
-      select, input[type="number"] {
-        font-size: 10px;
-        padding: 4px 5px;
-        min-width: 45px;
-      }
-      
-      .control-group {
-        gap: 3px;
-      }
-    }
-    
-    @media (max-width: 768px) {
-      .controls {
-        flex-wrap: wrap;
-        gap: 8px;
-        padding: 12px;
-      }
-      
-      .control-group {
-        flex-shrink: 1;
-      }
-      
-      h1 {
-        font-size: 1.8em;
-      }
-      
-      #plot {
-        max-height: calc(100vh - 250px);
-      }
-    }
-    
-    /* Settings Icon and Panel Styles */
-    .settings-icon {
-      font-size: 18px;
-      cursor: pointer;
-      color: #4a9eff;
-      transition: color 0.3s ease, transform 0.2s ease;
-      display: flex;
-      align-items: center;
-      padding: 4px;
-    }
-    
-    .settings-icon:hover {
-      color: #5ba3ff;
-      transform: rotate(90deg);
-    }
-    
-    .settings-panel {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(0, 0, 0, 0.8);
-      display: none;
-      z-index: 9999;
-      backdrop-filter: blur(5px);
-    }
-    
-    .settings-content {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      background: linear-gradient(135deg, #2a2a2a 0%, #1a1a1a 100%);
-      border: 1px solid rgba(255,255,255,0.2);
-      border-radius: 12px;
-      padding: 24px;
-      min-width: 300px;
-      box-shadow: 0 8px 32px rgba(0,0,0,0.6);
-    }
-    
-    .settings-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 20px;
-    }
-    
-    .settings-title {
-      font-size: 18px;
-      font-weight: 600;
-      color: #ffffff;
-    }
-    
-    .settings-close {
-      font-size: 24px;
-      cursor: pointer;
-      color: #999;
-      transition: color 0.3s ease;
-    }
-    
-    .settings-close:hover {
-      color: #fff;
-    }
-    
-    .settings-group {
-      margin-bottom: 16px;
-    }
-    
-    .settings-group label {
-      display: block;
-      margin-bottom: 6px;
-      font-weight: 500;
-      color: #d0d0d0;
-      font-size: 14px;
-    }
-    
-    .settings-group select {
-      width: 100%;
-      background: rgba(255,255,255,0.08);
-      border: 1px solid rgba(255,255,255,0.2);
-      color: #e8e8e8;
-      padding: 8px 12px;
-      border-radius: 6px;
-      font-size: 14px;
-      transition: all 0.3s ease;
-    }
-    
-    .settings-group select:focus {
-      outline: none;
-      background: rgba(255,255,255,0.15);
-      border-color: #4a9eff;
-      box-shadow: 0 0 0 2px rgba(74,158,255,0.2);
-    }
-    
-    .settings-buttons {
-      display: flex;
-      justify-content: flex-end;
-      gap: 12px;
-      margin-top: 24px;
-    }
-    
-    .settings-btn {
-      background: linear-gradient(145deg, #4a9eff 0%, #357abd 100%);
-      border: none;
-      color: white;
-      padding: 8px 16px;
-      border-radius: 6px;
-      font-size: 12px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.3s ease;
-      box-shadow: 0 3px 8px rgba(74,158,255,0.3);
-    }
-    
-    .settings-btn:hover {
-      background: linear-gradient(145deg, #5ba3ff 0%, #3d82c7 100%);
-      transform: translateY(-1px);
-      box-shadow: 0 4px 12px rgba(74,158,255,0.4);
-    }
-    
-    .settings-btn.secondary {
-      background: rgba(255,255,255,0.1);
-      box-shadow: 0 3px 8px rgba(0,0,0,0.2);
-    }
-    
-    .settings-btn.secondary:hover {
-      background: rgba(255,255,255,0.15);
-      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-    }
-    
-    /* Custom Shift RPM Dropdown Styles */
-    .custom-shift-dropdown {
-      position: relative;
-      display: inline-block;
-      z-index: 1000;
-    }
-    
-    .shift-rpm-display {
-      background: rgba(255,255,255,0.08);
-      border: 1px solid rgba(255,255,255,0.2);
-      color: #e8e8e8;
-      padding: 6px 8px;
-      border-radius: 4px;
-      font-size: 12px;
-      min-width: 60px;
-      cursor: pointer;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      transition: all 0.3s ease;
-    }
-    
-    .shift-rpm-display:hover {
-      background: rgba(255,255,255,0.12);
-      border-color: rgba(255,255,255,0.3);
-    }
-    
-    .dropdown-arrow {
-      font-size: 10px;
-      margin-left: 8px;
-      transition: transform 0.3s ease;
-    }
-    
-    .shift-rpm-options {
-      position: absolute;
-      top: calc(100% + 2px);
-      left: 0;
-      min-width: 120px;
-      width: max-content;
-      background: rgba(42,42,42,0.98);
-      border: 1px solid rgba(255,255,255,0.3);
-      border-radius: 6px;
-      z-index: 99999;
-      backdrop-filter: blur(15px);
-      box-shadow: 0 8px 24px rgba(0,0,0,0.5);
-    }
-    
-    .shift-option {
-      padding: 8px 12px;
-      cursor: pointer;
-      font-size: 12px;
-      color: #e8e8e8;
-      transition: background 0.3s ease;
-    }
-    
-    .shift-option:hover {
-      background: rgba(255,255,255,0.1);
-    }
-    
-    .shift-option.custom-input {
-      padding: 6px;
-    }
-    
-    .shift-option.custom-input input {
-      width: calc(100% - 16px);
-      background: rgba(255,255,255,0.08);
-      border: 1px solid rgba(255,255,255,0.2);
-      color: #e8e8e8;
-      padding: 6px 8px;
-      border-radius: 4px;
-      font-size: 12px;
-      box-sizing: border-box;
-    }
-    
-    .shift-option.custom-input input:focus {
-      outline: none;
-      background: rgba(255,255,255,0.15);
-      border-color: #4a9eff;
-      box-shadow: 0 0 0 1px rgba(74,158,255,0.3);
-    }
-  </style>
+  <link rel="stylesheet" href="styles.css">
 </head>
 <body>
   
@@ -453,20 +50,27 @@
     </div>
   </div>
 
-  <h1 style="text-align:center;">Kawasaki ZX-4R</h1>
+  <h1 id="bikeTitle" style="text-align:center;">Loading...</h1>
   <div class="controls">
     <div class="control-group">
       <div class="settings-icon" onclick="openSettings()" title="Units Settings">⚙️</div>
     </div>
 
     <div class="control-group">
+      <label for="bikeSelect">Bike:</label>
+      <select id="bikeSelect" onchange="changeBike()">
+        <option value="">Loading bikes...</option>
+      </select>
+    </div>
+
+    <div class="control-group">
       <label for="front">F-Sprocket:</label>
-      <input id="front" type="number" value="14" min="10" max="20" step="1" onchange="plotTorque(true)">
+      <input id="front" type="number" value="14" step="1" onchange="plotTorque(true)">
     </div>
 
     <div class="control-group">
       <label for="rear">R-Sprocket:</label>
-      <input id="rear" type="number" value="48" min="35" max="60" step="1" onchange="plotTorque(true)">
+      <input id="rear" type="number" value="48" step="1" onchange="plotTorque(true)">
     </div>
 
     <div class="control-group">
@@ -781,9 +385,14 @@ function closeSettings(event) {
 }
 
 // -------- Constants & data --------
-const primary_drive = 2.029;
-const tire_circ_in  = 77.15;
-const gear_ratios   = {1:2.92, 2:2.05, 3:1.62, 4:1.33, 5:1.15, 6:1.03};
+// These will be loaded from bike data files
+let primary_drive = 2.029;
+let tire_circ_in = 77.15;
+let gear_ratios = {1:2.92, 2:2.05, 3:1.62, 4:1.33, 5:1.15, 6:1.03};
+let Crr = 0.015;
+let CdA = 0.35;
+let hp_data_sets = {};
+let currentBikeData = null;
 
 // Accel sim - now handles different weight units
 function getMassLb() {
@@ -804,8 +413,7 @@ function getShiftMs() {
   return Number.isFinite(v) && v >= 0 ? v : 80;
 }
 
-const Crr = 0.015;
-const CdA = 0.35;
+// Crr and CdA now loaded from bike data
 const rho_air = 1.225;
 const g_mps2 = 9.80665;
 const LB_TO_KG = 0.45359237;
@@ -843,34 +451,7 @@ function interp1(xArr, yArr, x) {
   return y1 + (y2 - y1) * (x - x1) / (x2 - x1);
 }
 
-// Dense RPM array
-const hp_data_sets = {
-  Stock: [
-    3400,3500,3600,3700,3800,3900,4000,4100,4200,4300,4400,4500,4600,4700,4800,4900,5000,5100,5200,5300,5400,5500,5600,5700,5800,5900,6000,6100,6200,6300,6400,6500,6600,6700,6800,6900,7000,7100,7200,7300,7400,7500,7600,7700,7800,7900,8000,8100,8200,8300,8400,8500,8600,8700,8800,8900,9000,9100,9200,9300,9400,9500,9600,9700,9800,9900,10000,10100,10200,10300,10400,10500,10600,10700,10800,10900,11000,11100,11200,11300,11400,11500,11600,11700,11800,11900,12000,12100,12200,12300,12400,12500,12600,12700,12800,12900,13000,13100,13200,13300,13400,13500,13600,13700,13800,13900,14000,14100,14200,14300,14400,14500,14600,14700,14800,14900,15000,15100,15200,15300,15400,15500,15600,15700,15800,15900,16000
-  ].map((rpm, i) => [rpm, [
-    11.85,12.4,13.23,13.92,14.88,15.43,15.98,16.26,16.67,17.22,17.91,18.74,19.15,19.7,19.98,19.98,20.26,20.81,21.77,22.6,23.01,23.43,24.11,24.8,25.49,25.77,26.18,26.73,27.01,27.28,27.83,28.25,28.66,29.07,29.63,29.76,29.9,30.04,30.45,31.0,31.56,32.24,32.8,33.21,33.9,34.45,34.86,35.69,36.24,36.93,37.2,37.62,38.44,39.27,40.24,41.06,42.03,42.44,43.13,43.82,44.23,44.51,44.92,45.61,46.3,47.13,47.81,48.37,48.92,49.74,50.71,51.54,52.36,53.05,53.74,54.57,55.26,55.81,56.22,56.77,57.05,57.32,57.46,57.6,57.05,56.36,56.08,56.22,56.36,56.08,55.94,55.53,55.53,55.26,54.43,54.02,53.74,53.74,53.74,53.74,53.6,53.19,53.05,53.05,52.91,52.78,52.64,52.64,52.5,52.5,52.22,52.09,51.81,51.26,50.85,50.43,49.88,49.47,48.92,48.37,47.95,47.54,47.13,46.44,45.61,44.78,44.37
-  ][i]]),
-  Tuned: [
-    3400,3500,3600,3700,3800,3900,4000,4100,4200,4300,4400,4500,4600,4700,4800,4900,5000,5100,5200,5300,5400,5500,5600,5700,5800,5900,6000,6100,6200,6300,6400,6500,6600,6700,6800,6900,7000,7100,7200,7300,7400,7500,7600,7700,7800,7900,8000,8100,8200,8300,8400,8500,8600,8700,8800,8900,9000,9100,9200,9300,9400,9500,9600,9700,9800,9900,10000,10100,10200,10300,10400,10500,10600,10700,10800,10900,11000,11100,11200,11300,11400,11500,11600,11700,11800,11900,12000,12100,12200,12300,12400,12500,12600,12700,12800,12900,13000,13100,13200,13300,13400,13500,13600,13700,13800,13900,14000,14100,14200,14300,14400,14500,14600,14700,14800,14900,15000,15100,15200,15300,15400,15500,15600,15700,15800,15900,16000
-  ].map((rpm, i) => [rpm, [
-    12.93,13.75,14.72,15.27,15.82,16.23,16.64,17.05,17.47,17.74,18.15,18.43,18.7,19.12,19.53,20.22,20.9,21.18,21.73,22.14,22.69,23.1,23.79,24.07,24.2,24.89,25.58,26.4,26.68,27.09,27.64,28.06,28.47,29.02,29.43,29.98,30.53,31.08,31.77,32.32,33.01,33.56,34.24,35.07,35.62,36.17,36.58,37.27,37.68,38.37,39.06,39.61,40.02,40.57,41.26,42.08,42.91,44.28,45.11,45.93,46.48,47.03,47.45,47.86,48.13,48.68,49.23,50.06,50.88,51.43,52.12,53.08,53.91,54.73,55.7,56.39,57.07,57.62,58.04,58.86,59.96,60.24,60.37,60.65,61.2,61.34,61.61,62.02,62.71,63.26,63.67,64.22,64.77,65.6,65.87,66.01,66.84,67.39,67.94,68.49,68.62,69.17,69.72,70.55,71.1,71.24,71.38,71.38,71.51,71.51,71.24,70.83,70.41,70.14,69.59,69.04,68.21,67.11,66.42,65.74,65.05,64.22,63.4,62.44,61.47,60.51,59.55
-  ][i]]),
-  "Graves Full Exh": [
-    3400,3500,3600,3700,3800,3900,4000,4100,4200,4300,4400,4500,4600,4700,4800,4900,5000,5100,5200,5300,5400,5500,5600,5700,5800,5900,6000,6100,6200,6300,6400,6500,6600,6700,6800,6900,7000,7100,7200,7300,7400,7500,7600,7700,7800,7900,8000,8100,8200,8300,8400,8500,8600,8700,8800,8900,9000,9100,9200,9300,9400,9500,9600,9700,9800,9900,10000,10100,10200,10300,10400,10500,10600,10700,10800,10900,11000,11100,11200,11300,11400,11500,11600,11700,11800,11900,12000,12100,12200,12300,12400,12500,12600,12700,12800,12900,13000,13100,13200,13300,13400,13500,13600,13700,13800,13900,14000,14100,14200,14300,14400,14500,14600,14700,14800,14900,15000,15100,15200,15300,15400,15500,15600,15700,15800,15900,16000
-  ].map((rpm, i) => [rpm, [
-    12.88,13.31,13.74,14.31,15.17,15.6,16.03,16.6,17.46,17.89,18.32,18.89,19.46,19.89,20.32,20.89,21.61,22.18,22.75,23.33,23.9,24.47,24.9,25.33,25.62,25.9,26.48,27.05,27.33,27.76,28.34,28.91,29.48,30.05,30.48,30.77,31.48,31.63,32.06,32.63,33.35,33.77,34.35,34.92,35.78,36.64,37.07,37.64,38.21,39.07,39.64,40.07,40.79,42.79,44.65,45.8,46.94,48.37,48.8,48.94,49.09,49.37,49.66,50.23,50.66,51.23,51.81,52.67,53.52,54.24,54.96,56.1,56.96,57.82,59.25,59.82,60.68,61.68,62.54,62.54,63.26,63.54,63.97,64.26,64.54,64.83,64.83,64.97,65.69,65.97,66.69,67.12,67.69,68.26,69.12,69.84,70.41,70.98,71.84,72.7,72.84,73.27,74.13,74.42,74.42,74.42,74.42,74.42,74.7,74.85,74.85,74.42,73.99,73.85,73.56,73.13,72.7,71.99,71.41,70.7,70.27,69.27,68.84,68.12,67.26,65.97,65.55
-  ][i]]),
-  "M4 Full Exh": [
-    3400,3500,3600,3700,3800,3900,4000,4100,4200,4300,4400,4500,4600,4700,4800,4900,5000,5100,5200,5300,5400,5500,5600,5700,5800,5900,6000,6100,6200,6300,6400,6500,6600,6700,6800,6900,7000,7100,7200,7300,7400,7500,7600,7700,7800,7900,8000,8100,8200,8300,8400,8500,8600,8700,8800,8900,9000,9100,9200,9300,9400,9500,9600,9700,9800,9900,10000,10100,10200,10300,10400,10500,10600,10700,10800,10900,11000,11100,11200,11300,11400,11500,11600,11700,11800,11900,12000,12100,12200,12300,12400,12500,12600,12700,12800,12900,13000,13100,13200,13300,13400,13500,13600,13700,13800,13900,14000,14100,14200,14300,14400,14500,14600,14700,14800,14900,15000,15100,15200,15300,15400,15500,15600,15700,15800,15900,16000
-  ].map((rpm, i) => [rpm, [
-    13.3,13.8,14.18,14.47,15.04,15.32,15.74,16.17,16.6,17.02,17.87,18.44,19.15,19.86,20.57,21.28,21.7,21.99,22.41,22.84,23.55,24.4,25.11,25.96,26.67,27.23,27.94,28.65,29.22,29.93,30.35,30.92,31.63,32.34,33.05,33.48,33.9,34.33,34.75,35.18,35.6,36.03,36.6,37.16,37.59,37.73,38.3,38.87,39.43,40.0,40.43,41.7,42.84,44.11,45.39,46.67,47.94,48.94,49.5,49.93,50.35,50.78,50.92,51.35,52.06,52.48,53.05,53.33,53.76,54.75,56.03,56.74,57.73,58.58,59.57,60.43,60.99,62.27,62.84,63.55,63.97,64.4,64.96,65.11,65.53,65.96,66.52,66.95,67.23,67.66,68.09,68.79,69.36,70.07,70.64,71.21,71.77,72.34,72.91,73.76,74.18,74.75,75.32,75.74,76.31,76.6,76.74,76.74,76.74,76.74,76.74,76.45,76.17,76.03,75.46,75.04,74.61,74.33,73.62,73.05,72.62,72.06,71.63,70.78,70.21,69.22,68.09,67.94
-  ][i]]),
-  "Lo-Mnt/Stacks": [
-    3400,3500,3600,3700,3800,3900,4000,4100,4200,4300,4400,4500,4600,4700,4800,4900,5000,5100,5200,5300,5400,5500,5600,5700,5800,5900,6000,6100,6200,6300,6400,6500,6600,6700,6800,6900,7000,7100,7200,7300,7400,7500,7600,7700,7800,7900,8000,8100,8200,8300,8400,8500,8600,8700,8800,8900,9000,9100,9200,9300,9400,9500,9600,9700,9800,9900,10000,10100,10200,10300,10400,10500,10600,10700,10800,10900,11000,11100,11200,11300,11400,11500,11600,11700,11800,11900,12000,12100,12200,12300,12400,12500,12600,12700,12800,12900,13000,13100,13200,13300,13400,13500,13600,13700,13800,13900,14000,14100,14200,14300,14400,14500,14600,14700,14800,14900,15000,15100,15200,15300,15400,15500,15600,15700,15800,15900,16000
-  ].map((rpm, i) => [rpm, [
-    12.37,13.07,13.49,14.18,15.3,16.0,16.27,16.83,17.53,18.09,18.65,19.34,19.9,20.46,21.02,21.57,21.99,22.41,22.83,23.39,23.94,24.5,25.06,25.62,25.62,26.73,27.15,27.43,27.99,28.41,29.1,29.52,29.94,30.5,31.06,31.47,32.03,32.45,33.01,33.43,33.98,34.54,35.24,36.08,36.77,37.33,38.03,38.45,39.0,39.42,39.7,40.82,41.65,42.35,43.47,44.58,45.56,46.81,47.93,49.04,50.16,51.0,51.69,52.53,53.23,53.92,54.34,55.04,55.74,56.57,57.27,58.11,58.8,59.5,60.34,60.9,61.31,61.73,62.01,62.57,62.99,63.55,63.96,64.24,64.8,65.36,65.78,66.2,66.61,67.17,67.73,68.43,69.12,69.54,70.38,71.08,71.77,72.47,73.31,73.86,74.42,74.98,75.4,75.82,76.1,76.37,76.51,76.93,76.93,77.07,77.07,77.07,77.07,76.65,76.37,76.1,75.96,75.54,75.26,74.84,74.7,74.42,74.14,74.0,73.45,73.31,73.03
-  ][i]])
-};
+// hp_data_sets now loaded dynamically from bike data files
 
 const gear_colors = ['#FF0000', '#00FFFF', '#00FF00', '#FFFF00', '#F012BE', '#FFFFFF'];
 const freezeDashStyles = ['dot', 'dash', 'longdash', 'dashdot', 'solid'];
@@ -883,19 +464,59 @@ let maxX = 0, maxY = 0;
 let lastFamily = null;
 
 const densePoints = 750;
-const rpm_data_raw = hp_data_sets[Object.keys(hp_data_sets)[0]].map(([r, _]) => r);
-const rpmDense = (() => {
+let rpm_data_raw = [];
+let rpmDense = [];
+let hpDenseSets = {};
+
+function initializeHPData(hp_data_sets) {
+  rpm_data_raw = hp_data_sets[Object.keys(hp_data_sets)[0]].map(([r, _]) => r);
   const arr = [];
   const minR = rpm_data_raw[0];
   const maxR = rpm_data_raw[rpm_data_raw.length - 1];
   for (let i = 0; i <= densePoints; i++) arr.push(minR + (maxR - minR) * (i / densePoints));
-  return arr;
-})();
-const hpDenseSets = {};
-for (const key in hp_data_sets) {
-  const rpmArrRaw = hp_data_sets[key].map(([r, hp]) => r);
-  const hpArrRaw = hp_data_sets[key].map(([r, hp]) => hp);
-  hpDenseSets[key] = rpmDense.map(r => interp1(rpmArrRaw, hpArrRaw, r));
+  rpmDense = arr;
+  
+  hpDenseSets = {};
+  for (const key in hp_data_sets) {
+    const rpmArrRaw = hp_data_sets[key].map(([r, hp]) => r);
+    const hpArrRaw = hp_data_sets[key].map(([r, hp]) => hp);
+    hpDenseSets[key] = rpmDense.map(r => interp1(rpmArrRaw, hpArrRaw, r));
+  }
+}
+
+// Helper function to create bike-specific data sets
+function createBikeDataSets(bikeData) {
+  const hp_data = bikeData.hp_data_sets;
+  const rpm_raw = hp_data[Object.keys(hp_data)[0]].map(([r, _]) => r);
+  
+  const arr = [];
+  const minR = rpm_raw[0];
+  const maxR = rpm_raw[rpm_raw.length - 1];
+  for (let i = 0; i <= densePoints; i++) arr.push(minR + (maxR - minR) * (i / densePoints));
+  const rpmDense = arr;
+  
+  const hpDenseSets = {};
+  for (const key in hp_data) {
+    const rpmArrRaw = hp_data[key].map(([r, hp]) => r);
+    const hpArrRaw = hp_data[key].map(([r, hp]) => hp);
+    hpDenseSets[key] = rpmDense.map(r => interp1(rpmArrRaw, hpArrRaw, r));
+  }
+  
+  return {
+    rpmDense,
+    hpDenseSets,
+    hp_data_sets: hp_data,
+    specifications: bikeData.specifications
+  };
+}
+
+// Helper function to get bike-specific data by bike ID
+function getBikeDataSets(bikeId) {
+  if (!BIKES_DATA || !BIKES_DATA[bikeId]) {
+    console.error(`Bike data not found for ID: ${bikeId}`);
+    return null;
+  }
+  return createBikeDataSets(BIKES_DATA[bikeId]);
 }
 
 // Utility
@@ -909,20 +530,45 @@ function regenerateFrozenTraces() {
   const currentView = document.getElementById('viewSelect').value;
   const currentFamily = viewFamily(currentView);
   
+  // Store current global bike variables so we can restore them later
+  const originalGlobals = {
+    primary_drive,
+    tire_circ_in, 
+    Crr,
+    CdA,
+    gear_ratios
+  };
+  
   frozenConfigurations.forEach((config, configIndex) => {
     const dashStyle = (currentFamily === 'wheel') ? freezeDashStyles[configIndex % freezeDashStyles.length] : 'solid';
-    const { front, rear, hpKey, weightLb, shiftMs, shiftRpmSetting } = config;
+    const { bikeId, front, rear, hpKey, weightLb, shiftMs, shiftRpmSetting } = config;
+    
+    // Get bike-specific data for this frozen configuration
+    const bikeData = getBikeDataSets(bikeId);
+    if (!bikeData) {
+      console.error(`Cannot regenerate frozen trace: bike data not found for ${bikeId}`);
+      return;
+    }
+    
+    // Temporarily set global bike variables to this frozen config's bike data
+    const bikeSpecs = bikeData.specifications;
+    primary_drive = bikeSpecs.primary_drive;
+    tire_circ_in = bikeSpecs.tire_circ_in;
+    Crr = bikeSpecs.Crr;
+    CdA = bikeSpecs.CdA;
+    gear_ratios = bikeSpecs.gear_ratios;
+    
     const fd = rear / front;
-    const rpmArr = rpmDense;
-    const hpArr = hpDenseSets[hpKey];
+    const rpmArr = bikeData.rpmDense;
+    const hpArr = bikeData.hpDenseSets[hpKey];
     
     // Add spacer for legend grouping
     frozenTraces.push({ x:[null], y:[null], mode:'lines', name:'\u00A0', showlegend:true, hoverinfo:'skip', line:{color:'rgba(0,0,0,0)', width:0} });
     
     if (currentFamily === 'dyno') {
-      const hpArrRaw = hp_data_sets[hpKey].map(([r, hp]) => hp);
-      const rpmArrRaw = hp_data_sets[hpKey].map(([r, hp]) => r);
-      const engTq = hp_data_sets[hpKey].map(([rpm, hp]) => (hp * 5252) / rpm);
+      const hpArrRaw = bikeData.hp_data_sets[hpKey].map(([r, hp]) => hp);
+      const rpmArrRaw = bikeData.hp_data_sets[hpKey].map(([r, hp]) => r);
+      const engTq = bikeData.hp_data_sets[hpKey].map(([rpm, hp]) => (hp * 5252) / rpm);
       
       // Convert to user's preferred units
       const hpConverted = hpArrRaw.map(hp => UnitConverter.convertPower(hp, userPreferences.power));
@@ -932,7 +578,9 @@ function regenerateFrozenTraces() {
       frozenTraces.push({ x:rpmArrRaw, y:tqConverted, mode:'lines', showlegend:false, hoverinfo:'x+y', hovertemplate:`RPM: %{x} RPM<br>Torque: %{y:.1f} ${userPreferences.torque}<extra></extra>`, line:{ color: lineColor, shape:'spline', width:2 }, opacity:0.7 });
       frozenTraces.push({ x:rpmArrRaw, y:hpConverted, mode:'lines', showlegend:false, hoverinfo:'x+y', hovertemplate:`RPM: %{x} RPM<br>Power: %{y:.1f} ${userPreferences.power}<extra></extra>`, line:{ color: lineColor, shape:'spline', width:2 }, opacity:0.7 });
       const maxHP = Math.max(...hpConverted), maxTQ = Math.max(...tqConverted);
-      frozenTraces.push({ x:[null], y:[null], mode:'lines', name:hpKey, showlegend:true, hoverinfo:'skip', line:{ color:'rgba(0,0,0,0)', width:0 } });
+      const bikeName = BIKES_DATA[bikeId]?.name || bikeId;
+      frozenTraces.push({ x:[null], y:[null], mode:'lines', name:bikeName, showlegend:true, hoverinfo:'skip', line:{ color:lineColor, shape:'spline', width:3 } });
+      frozenTraces.push({ x:[null], y:[null], mode:'lines', name:hpKey, showlegend:true, hoverinfo:'skip', line:{ color:lineColor, shape:'spline', width:2 } });
       frozenTraces.push({ x:[null], y:[null], mode:'lines', name:`Max ${userPreferences.power}: ${maxHP.toFixed(1)}`, showlegend:true, hoverinfo:'skip', line:{ color:lineColor, shape:'spline', width:2 } });
       frozenTraces.push({ x:[null], y:[null], mode:'lines', name:`Max ${userPreferences.torque}: ${maxTQ.toFixed(1)}`, showlegend:true, hoverinfo:'skip', line:{ color:lineColor, shape:'spline', width:2 } });
     }
@@ -956,7 +604,9 @@ function regenerateFrozenTraces() {
       const lineColor = gear_colors[configIndex % gear_colors.length];
       const weightUnit = UnitConverter.getWeightUnit(userPreferences.speed);
       const displayWeight = UnitConverter.convertWeight(weightLb, weightUnit);
+      const bikeName = BIKES_DATA[bikeId]?.name || bikeId;
       
+      frozenTraces.push({ x:[null], y:[null], mode:'lines', name:bikeName, showlegend:true, hoverinfo:'skip', line:{color:lineColor, width:3, shape:'spline'} });
       frozenTraces.push({ x:[null], y:[null], mode:'lines', name:`(F${front}/R${rear} ${hpKey})`, showlegend:true, hoverinfo:'skip', line:{color:lineColor, width:2, shape:'spline'} });
       frozenTraces.push({ x:[null], y:[null], mode:'lines', name:`Weight: ${Math.round(displayWeight)} ${weightUnit}`, showlegend:true, hoverinfo:'skip', line:{color:lineColor, width:2, shape:'spline'} });
       frozenTraces.push({ x:[null], y:[null], mode:'lines', name:`Shift Time: ${shiftMs} ms`, showlegend:true, hoverinfo:'skip', line:{color:lineColor, width:2, shape:'spline'} });
@@ -999,12 +649,15 @@ function regenerateFrozenTraces() {
     else if (currentFamily === 'wheel') {
       const { wt, shift_speed, shift_rpm } = computeShiftPoints(hpArr, fd, rpmArr, shiftRpmSetting);
       const truncate = document.getElementById("truncateCross").checked;
+      const lineColor = gear_colors[configIndex % gear_colors.length];
+      const bikeName = BIKES_DATA[bikeId]?.name || bikeId;
+      frozenTraces.push({ x:[null], y:[null], mode:'lines', name:bikeName, showlegend:true, hoverinfo:'skip', line:{ color:lineColor, shape:'spline', width:3 } });
       frozenTraces.push({ x:[null], y:[null], mode:'lines', name:`(F${front}/R${rear} ${hpKey})`, showlegend:true, hoverinfo:'skip', line:{ color: gear_colors[0], width: 2, dash: dashStyle, shape: 'spline' } });
       
       // Add gear traces (applying clip lines setting)
       for (let g = 1; g <= 6; g++) {
-        const speeds = rpmArr.map(r => rpmToSpeed(r, gear_ratios[g], fd));
-        const torques = hpToWheelTorqueAt(rpmArr, hpArr, gear_ratios[g], fd);
+        const speeds = rpmArr.map(r => rpmToSpeed(r, bikeSpecs.gear_ratios[g], fd));
+        const torques = hpToWheelTorqueAt(rpmArr, hpArr, bikeSpecs.gear_ratios[g], fd);
         let xPts = [], yPts = [], rpmPts = [];
         for (let i = 0; i < rpmArr.length; i++) {
           const sp = speeds[i], tq = torques[i], rp = rpmArr[i];
@@ -1023,7 +676,7 @@ function regenerateFrozenTraces() {
           }
           else if (g === 6) { 
             const red = rpmArr[rpmArr.length - 1]; 
-            const sp = rpmToSpeed(red, gear_ratios[g], fd);
+            const sp = rpmToSpeed(red, bikeSpecs.gear_ratios[g], fd);
             const convertedSp = UnitConverter.convertSpeed(sp, userPreferences.speed);
             label += ` (${Math.round(red)} RPM / ${convertedSp.toFixed(1)} ${userPreferences.speed})`; 
           }
@@ -1055,6 +708,13 @@ function regenerateFrozenTraces() {
       }
     }
   });
+  
+  // Restore original global bike variables
+  primary_drive = originalGlobals.primary_drive;
+  tire_circ_in = originalGlobals.tire_circ_in;
+  Crr = originalGlobals.Crr;
+  CdA = originalGlobals.CdA;
+  gear_ratios = originalGlobals.gear_ratios;
 }
 function toggleControlVisibility() {
   const view = document.getElementById('viewSelect').value;
@@ -1353,8 +1013,12 @@ document.addEventListener('click', function(event) {
   }
 });
 
-// Fixed axis bounds calculated once using max HP data and extreme sprocket combo
-const FIXED_AXIS_BOUNDS = (() => {
+// Fixed axis bounds calculated when bike data loads
+let FIXED_AXIS_BOUNDS = null;
+
+function calculateAxisBounds() {
+  if (!hp_data_sets || !gear_ratios) return;
+  
   // Find max HP across all datasets
   let maxHpValue = 0;
   let maxHpDataset = null;
@@ -1412,7 +1076,7 @@ const FIXED_AXIS_BOUNDS = (() => {
   // Use full simulation distance to ensure Y-axis shows all data beyond 35 seconds
   const effectiveMaxDistance = maxAccelDistance;
   
-  return {
+  FIXED_AXIS_BOUNDS = {
     // Convert to user units on demand
     wheel: {
       maxSpeed: Math.max(160, Math.ceil(maxWheelSpeed * 1.1 / 10) * 10), // At least 160 MPH for speed axis
@@ -1431,7 +1095,7 @@ const FIXED_AXIS_BOUNDS = (() => {
       maxG: 1.0 // Always 1G max for G-force charts
     }
   };
-})();
+}
 
 function getPlotBounds() {
   // Legacy function - bounds are now pre-calculated in FIXED_AXIS_BOUNDS
@@ -1441,6 +1105,7 @@ function getPlotBounds() {
 
 function freezeCurrentTraces() {
   // Store current configuration instead of generating traces
+  const bikeId = document.getElementById('bikeSelect').value;
   const front = parseInt(document.getElementById('front').value);
   const rear = parseInt(document.getElementById('rear').value);
   const hpKey = document.getElementById('hpData').value;
@@ -1448,8 +1113,8 @@ function freezeCurrentTraces() {
   const shiftMs = getShiftMs();
   const shiftRpmSetting = getCurrentShiftRpmSetting();
   
-  // Add configuration to frozen configurations array
-  frozenConfigurations.push({ front, rear, hpKey, weightLb, shiftMs, shiftRpmSetting });
+  // Add configuration to frozen configurations array including bike ID
+  frozenConfigurations.push({ bikeId, front, rear, hpKey, weightLb, shiftMs, shiftRpmSetting });
   freezeCount++;
   
   // Regenerate all frozen traces for current view
@@ -1460,8 +1125,16 @@ function freezeCurrentTraces() {
   plotTorque(false); // <--- This line redraws the plot after freezing traces
 }
 function clearFrozenTraces() {
-  document.getElementById("front").value = "14";
-  document.getElementById("rear").value = "48";
+  // Reset to bike-specific defaults
+  const specs = currentBikeData?.specifications;
+  if (specs) {
+    document.getElementById("front").value = specs.sprockets.front;
+    document.getElementById("rear").value = specs.sprockets.rear;
+  } else {
+    // Fallback to hardcoded defaults if no bike data
+    document.getElementById("front").value = "14";
+    document.getElementById("rear").value = "48";
+  }
   document.getElementById("hpData").value = "Stock";
   document.getElementById("shiftRpmSelect").value = "optimal";
   document.getElementById("shiftRpmDisplayText").textContent = "Optimal";
@@ -1521,7 +1194,8 @@ function plotTorque(animate = true) {
     ];
     const maxHP = Math.max(...hpConverted), maxTQ = Math.max(...tqConverted);
     const legendTraces = [
-      { x:[null], y:[null], mode:'lines', name:hpKey, showlegend:true, hoverinfo:'skip', line:{ color:'rgba(0,0,0,0)', width:0 } },
+      { x:[null], y:[null], mode:'lines', name:currentBikeData.name, showlegend:true, hoverinfo:'skip', line:{ color:currentColor, shape:'spline', width:3 } },
+      { x:[null], y:[null], mode:'lines', name:hpKey, showlegend:true, hoverinfo:'skip', line:{ color:currentColor, shape:'spline', width:2 } },
       { x:[null], y:[null], mode:'lines', name:`Max ${userPreferences.power}: ${maxHP.toFixed(1)}`, showlegend:true, hoverinfo:'skip', line:{ color:currentColor, shape:'spline', width:2 } },
       { x:[null], y:[null], mode:'lines', name:`Max ${userPreferences.torque}: ${maxTQ.toFixed(1)}`, showlegend:true, hoverinfo:'skip', line:{ color:currentColor, shape:'spline', width:2 } }
     ];
@@ -1584,6 +1258,7 @@ function plotTorque(animate = true) {
     const weightUnit = UnitConverter.getWeightUnit(userPreferences.speed);
     const displayWeight = UnitConverter.convertWeight(weightLb, weightUnit);
     
+    traces.push({ x:[null], y:[null], mode:'lines', name:currentBikeData.name, showlegend:true, hoverinfo:'skip', line:{ color: currentColor, width:3, shape:'spline' } });
     traces.push({ x:[null], y:[null], mode:'lines', name:`(F${front}/R${rear} ${hpKey})`, showlegend:true, hoverinfo:'skip', line:{ color: currentColor, width:2, shape:'spline' } });
     traces.push({ x:[null], y:[null], mode:'lines', name:`Weight: ${Math.round(displayWeight)} ${weightUnit}`, showlegend:true, hoverinfo:'skip', line:{ color: currentColor, width:2, shape:'spline' } });
     traces.push({ x:[null], y:[null], mode:'lines', name:`Shift Time: ${shiftMs} ms`, showlegend:true, hoverinfo:'skip', line:{ color: currentColor, width:2, shape:'spline' } });
@@ -1667,6 +1342,7 @@ function plotTorque(animate = true) {
   const truncate = document.getElementById("truncateCross").checked;
   const traces = [];
   const groupLabel = `(F${front}/R${rear} ${hpKey})`;
+  traces.push({ x:[null], y:[null], mode:'lines', name:currentBikeData.name, showlegend:true, hoverinfo:'skip', line:{ color: gear_colors[0], width:3, shape:'spline' } });
   traces.push({ x:[null], y:[null], mode:'lines', name:groupLabel, showlegend:true, hoverinfo:'skip', line:{ color: gear_colors[0], width:2, shape:'spline' } });
 
   for (let g = 1; g <= 6; g++) {
@@ -1765,8 +1441,154 @@ function adjustLayout() {
   }
 }
 
-function init() { 
+// Global bikes data
+let BIKES_DATA = null;
+
+// Simple bike data loader
+async function loadBikesData() {
+  const response = await fetch('bikes-data.json');
+  if (!response.ok) {
+    throw new Error(`HTTP error! status: ${response.status}`);
+  }
+  BIKES_DATA = await response.json();
+  console.log('Bikes data loaded:', Object.keys(BIKES_DATA));
+  return true;
+}
+
+// Bike management functions
+function initializeBikes() {
+  if (!BIKES_DATA) {
+    console.error('No bike data available');
+    return false;
+  }
+  
+  try {
+    // Load default bike
+    currentBikeData = BIKES_DATA['kawasaki-zx4rr'];
+    
+    // Update global variables with bike data
+    loadBikeData();
+    
+    // Populate bike selection dropdown
+    populateBikeDropdown();
+    
+    // Update UI with bike name
+    updateBikeTitle();
+    
+    console.log('Bikes initialized successfully');
+    return true;
+  } catch (error) {
+    console.error('Failed to initialize bikes:', error);
+    return false;
+  }
+}
+
+function loadBikeData() {
+  if (!currentBikeData) return;
+  
+  const specs = currentBikeData.specifications;
+  
+  // Load bike specifications into global variables
+  primary_drive = specs.primary_drive;
+  tire_circ_in = specs.tire_circ_in;
+  gear_ratios = specs.gear_ratios;
+  Crr = specs.Crr;
+  CdA = specs.CdA;
+  hp_data_sets = currentBikeData.hp_data_sets;
+  
+  // Initialize HP interpolation data
+  initializeHPData(hp_data_sets);
+  
+  // Calculate axis bounds for plots
+  calculateAxisBounds();
+  
+  // Update sprocket controls with bike-specific defaults
+  const frontInput = document.getElementById('front');
+  const rearInput = document.getElementById('rear');
+  
+  if (frontInput) {
+    frontInput.value = specs.sprockets.front;
+  }
+  
+  if (rearInput) {
+    rearInput.value = specs.sprockets.rear;
+  }
+  
+  // Update weight default
+  const weightInput = document.getElementById('weightLb');
+  if (weightInput) {
+    weightInput.value = specs.default_weight_lb;
+  }
+}
+
+function populateBikeDropdown() {
+  const bikeSelect = document.getElementById('bikeSelect');
+  if (!bikeSelect || !BIKES_DATA) return;
+  
+  bikeSelect.innerHTML = ''; // Clear existing options
+  
+  // Populate from bikes data
+  Object.keys(BIKES_DATA).forEach(bikeId => {
+    const bike = BIKES_DATA[bikeId];
+    const option = document.createElement('option');
+    option.value = bikeId;
+    option.textContent = bike.name;
+    option.selected = bikeId === 'kawasaki-zx4rr'; // Default selection
+    bikeSelect.appendChild(option);
+  });
+}
+
+function updateBikeTitle() {
+  const titleElement = document.getElementById('bikeTitle');
+  if (titleElement && currentBikeData) {
+    titleElement.textContent = currentBikeData.name;
+  }
+}
+
+function changeBike() {
+  const bikeSelect = document.getElementById('bikeSelect');
+  if (!bikeSelect || !bikeSelect.value || !BIKES_DATA) return;
+  
+  try {
+    currentBikeData = BIKES_DATA[bikeSelect.value];
+    if (!currentBikeData) {
+      throw new Error(`Bike ${bikeSelect.value} not found`);
+    }
+    
+    loadBikeData();
+    updateBikeTitle();
+    
+    // Refresh the UI
+    populateHpDropdown();
+    plotTorque(true);
+    
+    console.log('Switched to bike:', currentBikeData.name);
+  } catch (error) {
+    console.error('Failed to load bike:', error);
+  }
+}
+
+async function init() { 
   loadUnitPreferences(); // Load saved preferences
+  
+  // Load bike data first
+  const dataLoaded = await loadBikesData();
+  
+  if (dataLoaded) {
+    // Initialize bikes if data loaded successfully
+    const bikesLoaded = initializeBikes();
+    if (!bikesLoaded) {
+      console.error('Failed to initialize bikes, using defaults');
+    }
+  } else {
+    console.error('Failed to load bike data, using hardcoded defaults');
+    // Set fallback bike dropdown
+    const bikeSelect = document.getElementById('bikeSelect');
+    if (bikeSelect) {
+      bikeSelect.innerHTML = '<option value="">No bikes available</option>';
+    }
+  }
+  
   populateHpDropdown(); 
   populateShiftRpmDropdown(); 
   getPlotBounds(); 
