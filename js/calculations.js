@@ -127,7 +127,7 @@ function computeShiftPoints(hpArr, final_drive, rpmArr, shiftRpmOverride = null)
 }
 
 // Acceleration simulation with trapezoidal distance and shift time
-function simulateAccel(hpArr, rpmArr, final_drive, dt = 0.02, mass_lb_param = getMassLb(), shift_ms = getShiftMs(), shiftRpmOverride = null) {
+function simulateAccel(hpArr, rpmArr, final_drive, dt = 0.02, mass_lb_param = getMassLb(), shift_ms = getShiftMs(), shiftRpmOverride = null, maxTime = null) {
   const wheel_radius_m = getWheelRadius();
   
   function wheelTorqueAtSpeed(speed_mps, gear) {
@@ -173,8 +173,15 @@ function simulateAccel(hpArr, rpmArr, final_drive, dt = 0.02, mass_lb_param = ge
     }
 
     const rpm_now = speedToRpm(v * MPS_TO_MPH, gear_ratios[g], final_drive);
-    // Only terminate at redline if we've reached at least 35 seconds
-    if (t >= 35 && g === 6 && rpm_now >= max_rpm) break;
+    
+    // If maxTime is specified, only terminate when we reach that exact time
+    if (maxTime !== null) {
+      if (t >= maxTime) break;
+    } else {
+      // Original termination logic for non-gap simulations
+      // Only terminate at redline if we've reached at least 35 seconds
+      if (t >= 35 && g === 6 && rpm_now >= max_rpm) break;
+    }
 
     const F_roll = Crr * mass_kg * g_mps2;
     const F_aero = 0.5 * rho_air * CdA * v * v;
@@ -192,12 +199,140 @@ function simulateAccel(hpArr, rpmArr, final_drive, dt = 0.02, mass_lb_param = ge
     S.push(s * M_TO_FT);
     G.push(g);
 
-    // Only allow early termination if we've reached at least 35 seconds
-    if (t >= 35 && a < 0.01 && v > 60 * MPH_TO_MPS) {
-      if (T.length > 200 && Math.abs(V[V.length - 1] - V[V.length - 200]) < 0.1) break;
+    // If maxTime is specified, don't allow early termination
+    if (maxTime === null) {
+      // Only allow early termination if we've reached at least 35 seconds
+      if (t >= 35 && a < 0.01 && v > 60 * MPH_TO_MPS) {
+        if (T.length > 200 && Math.abs(V[V.length - 1] - V[V.length - 200]) < 0.1) break;
+      }
     }
   }
   return { T, V, A, S, G, shiftMarkers };
+}
+
+// Calculate gap data for multiple acceleration simulations
+// Takes array of simulation results and returns gap relative to slowest bike
+function calculateGapData(simulations) {
+  if (!simulations || simulations.length === 0) return null;
+  if (simulations.length === 1) {
+    // Single bike case - just return zero gap
+    const sim = simulations[0];
+    return [{
+      T: sim.T,
+      gap: sim.T.map(() => 0), // All zeros for single bike
+      actualDistance: sim.S
+    }];
+  }
+  
+  // Since all simulations should now run for the same duration when maxTime is specified,
+  // they should all have the same or very similar time arrays.
+  // Use the first simulation as reference time array
+  const referenceSim = simulations[0];
+  const timePoints = [...referenceSim.T];
+  
+  // Interpolate all simulations to reference time points
+  const distanceArrays = simulations.map(sim => {
+    return timePoints.map(t => {
+      // Use direct indexing if time arrays are identical, otherwise interpolate
+      if (sim.T.length === timePoints.length && Math.abs(sim.T[sim.T.length - 1] - timePoints[timePoints.length - 1]) < 0.01) {
+        // Time arrays are very similar, use direct mapping for better accuracy
+        const index = sim.T.findIndex(simTime => Math.abs(simTime - t) < 0.01);
+        return index >= 0 ? sim.S[index] : interp1(sim.T, sim.S, t);
+      } else {
+        // Fall back to interpolation
+        return interp1(sim.T, sim.S, t);
+      }
+    });
+  });
+  
+  // Calculate gap relative to slowest at each time point
+  const gapResults = simulations.map(() => ({
+    T: [...timePoints],
+    gap: [],
+    actualDistance: []
+  }));
+  
+  for (let timeIndex = 0; timeIndex < timePoints.length; timeIndex++) {
+    // Find minimum distance at this time point (slowest bike)
+    let minDistance = Infinity;
+    for (let simIndex = 0; simIndex < distanceArrays.length; simIndex++) {
+      const distance = distanceArrays[simIndex][timeIndex];
+      if (distance < minDistance) {
+        minDistance = distance;
+      }
+    }
+    
+    // Calculate gap for each bike relative to slowest
+    for (let simIndex = 0; simIndex < distanceArrays.length; simIndex++) {
+      const distance = distanceArrays[simIndex][timeIndex];
+      const gap = distance - minDistance; // Gap ahead of slowest bike
+      gapResults[simIndex].gap.push(gap);
+      gapResults[simIndex].actualDistance.push(distance);
+    }
+  }
+  
+  return gapResults;
+}
+
+// Calculate optimal axis range based on data values (works for both X and Y axes)
+// Rule: Only change axis if max data point is NOT between 90%-100% of current axis max
+// If change needed: Scale so max data point = 90% of axis max
+function calculateOptimalAxisRange(allData, minVal = 0, currentMax = null) {
+  if (!allData || allData.length === 0) {
+    return [minVal, currentMax || Math.max(minVal + 10, 100)]; // Keep current or fallback
+  }
+  
+  // Filter out null, undefined, and NaN values
+  const validData = allData.filter(val => val !== null && val !== undefined && !isNaN(val) && isFinite(val));
+  
+  if (validData.length === 0) {
+    return [minVal, currentMax || Math.max(minVal + 10, 100)]; // Keep current or fallback
+  }
+  
+  const maxDataValue = Math.max(...validData);
+  
+  // If max data value is 0 or negative, keep current or use sensible minimum
+  if (maxDataValue <= 0) {
+    return [minVal, currentMax || Math.max(minVal + 10, 100)];
+  }
+  
+  // If we have a current axis max, check if it meets the rule
+  if (currentMax && currentMax > 0) {
+    const dataPercentOfAxis = maxDataValue / currentMax;
+    // Rule: If max data point is between 90%-100% of axis, don't change anything
+    if (dataPercentOfAxis >= 0.90 && dataPercentOfAxis <= 1.0) {
+      return [minVal, currentMax]; // Keep current axis
+    }
+  }
+  
+  // Current axis doesn't meet rule (or no current axis) - calculate new axis
+  // Scale so max data point = 90% of axis max
+  const axisMax = maxDataValue / 0.9;
+  
+  // Round up to nice numbers for cleaner display
+  let roundedMax;
+  if (axisMax <= 2) {
+    // For small values like G-forces, round to nearest 0.25
+    roundedMax = Math.ceil(axisMax / 0.25) * 0.25;
+  } else if (axisMax <= 10) {
+    // Round to nearest 0.5 for values 2-10
+    roundedMax = Math.ceil(axisMax / 0.5) * 0.5;
+  } else if (axisMax <= 100) {
+    roundedMax = Math.ceil(axisMax / 5) * 5; // Round to nearest 5
+  } else if (axisMax <= 1000) {
+    roundedMax = Math.ceil(axisMax / 10) * 10; // Round to nearest 10
+  } else if (axisMax <= 10000) {
+    roundedMax = Math.ceil(axisMax / 50) * 50; // Round to nearest 50
+  } else {
+    roundedMax = Math.ceil(axisMax / 100) * 100; // Round to nearest 100
+  }
+  
+  return [minVal, roundedMax];
+}
+
+// Backward-compatible wrapper for Y-axis
+function calculateOptimalYRange(allYData, minY = 0, currentYMax = null) {
+  return calculateOptimalAxisRange(allYData, minY, currentYMax);
 }
 
 // Calculate axis bounds for all chart types
@@ -261,6 +396,47 @@ function calculateAxisBounds() {
   // Use full simulation distance to ensure Y-axis shows all data beyond 35 seconds
   const effectiveMaxDistance = maxAccelDistance;
   
+  // Calculate maximum gap for gap vs time plots using extreme bike differences
+  // Compare slowest (heavy + low HP) vs fastest (light + high HP) bike
+  const minWeightLb = 300; // Min from weight input
+  const minShiftTime = 0; // Min from shift time input
+  const minFinalDrive = 12 / 53; // Smallest front, largest rear (slowest)
+  const maxFinalDrive = 50 / 13; // Largest front, smallest rear (fastest)
+  
+  // Find min HP dataset
+  let minHpValue = Infinity;
+  let minHpDataset = null;
+  let maxGap = 0; // Initialize maxGap
+  
+  Object.entries(hp_data_sets).forEach(([key, data]) => {
+    const avgHp = data.reduce((sum, [rpm, hp]) => sum + hp, 0) / data.length;
+    if (avgHp < minHpValue) {
+      minHpValue = avgHp;
+      minHpDataset = key;
+    }
+  });
+  
+  if (minHpDataset && hpDenseSets[minHpDataset] && hpDenseSets[maxHpDataset]) {
+    const gapSimTime = Math.max(35, Math.ceil(maxAccelTime * 1.1));
+    const slowestSim = simulateAccel(hpDenseSets[minHpDataset], rpmDense, minFinalDrive, 0.02, maxWeightLb, maxShiftTime, null, gapSimTime);
+    const fastestSim = simulateAccel(hpDenseSets[maxHpDataset], rpmDense, maxFinalDrive, 0.02, minWeightLb, minShiftTime, null, gapSimTime);
+    
+    const gapData = calculateGapData([slowestSim, fastestSim]);
+    if (gapData && gapData.length > 0) {
+      gapData.forEach(gap => {
+        const maxGapForThisBike = Math.max(...gap.gap);
+        if (maxGapForThisBike > maxGap) maxGap = maxGapForThisBike;
+      });
+    }
+    // Add 20% margin to max gap
+    maxGap = Math.ceil(maxGap * 1.2 / 100) * 100;
+  }
+  
+  // Fallback if gap calculation fails or no gap calculated
+  if (maxGap === 0) {
+    maxGap = Math.ceil(effectiveMaxDistance * 0.3 / 100) * 100;
+  }
+  
   FIXED_AXIS_BOUNDS = {
     // Convert to user units on demand
     wheel: {
@@ -277,7 +453,8 @@ function calculateAxisBounds() {
       maxTime: Math.max(35, Math.ceil(maxAccelTime * 1.1)), // At least 35 seconds
       maxSpeed: Math.max(160, Math.ceil(maxAccelSpeed * 1.1 / 10) * 10), // At least 160 MPH
       maxDistance: Math.ceil(effectiveMaxDistance * 2.0 / 100) * 100, // Use full distance with 100% extra margin to ensure visibility at 35s
-      maxG: 1.0 // Always 1G max for G-force charts
+      maxG: 1.0, // Always 1G max for G-force charts
+      maxGap: maxGap // Maximum gap distance for gap vs time plots
     }
   };
 }

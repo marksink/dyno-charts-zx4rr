@@ -185,6 +185,16 @@ function clearFrozenTraces() {
   frozenTraces = []; 
   freezeCount = 0; 
   frozenConnectorTraces = [];
+  // Reset current axis bounds to allow fresh calculations
+  currentAxisBounds = {
+    dyno: { xMax: null, yMax: null },
+    wheel: { xMax: null, yMax: null },
+    accel_ts: { xMax: null, yMax: null },
+    accel_td: { xMax: null, yMax: null },
+    accel_tg: { xMax: null, yMax: null },
+    accel_sg: { xMax: null, yMax: null },
+    accel_gap: { xMax: null, yMax: null }
+  };
   plotTorque();
 }
 

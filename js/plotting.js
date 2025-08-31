@@ -12,6 +12,16 @@ let frozenConnectorTraces = [];
 let previousTraces = [];
 let maxX = 0, maxY = 0;
 let lastFamily = null;
+// Track current X and Y axis bounds for each plot type to avoid unnecessary rescaling
+let currentAxisBounds = {
+  dyno: { xMax: null, yMax: null },
+  wheel: { xMax: null, yMax: null },
+  accel_ts: { xMax: null, yMax: null },
+  accel_td: { xMax: null, yMax: null },
+  accel_tg: { xMax: null, yMax: null },
+  accel_sg: { xMax: null, yMax: null },
+  accel_gap: { xMax: null, yMax: null }
+};
 
 // Utility function to categorize view types
 function viewFamily(v) { 
@@ -96,7 +106,9 @@ function regenerateFrozenTraces() {
       frozenTraces.push({ x:[null], y:[null], mode:'lines', name:`Max ${userPreferences.torque}: ${maxTQ.toFixed(1)}`, showlegend:true, hoverinfo:'skip', line:{ color:lineColor, shape:'spline', width:2 } });
     }
     else if (currentFamily === 'accel') {
-      const sim = simulateAccel(hpArr, rpmArr, fd, 0.02, weightLb, shiftMs, shiftRpmSetting);
+      // Use synchronized time with finer resolution for gear shift detail
+      const accelMaxTime = FIXED_AXIS_BOUNDS.accel.maxTime;
+      const sim = simulateAccel(hpArr, rpmArr, fd, 0.01, weightLb, shiftMs, shiftRpmSetting, accelMaxTime);
       let xData, yData, showShift = false;
       
       // Convert speed data to user's preferred units  
@@ -107,7 +119,18 @@ function regenerateFrozenTraces() {
       const distanceConverted = sim.S.map(ft => UnitConverter.convertDistance(ft, distanceUnit));
       
       if (currentView === 'accel_ts') { xData = sim.T; yData = speedConverted; showShift = true; }
-      else if (currentView === 'accel_td') { xData = sim.T; yData = distanceConverted; }
+      else if (currentView === 'accel_td') { 
+        // Calculate distance rate for frozen traces too
+        const distanceRate = [];
+        for (let i = 1; i < sim.S.length; i++) {
+          const dt = sim.T[i] - sim.T[i-1];
+          const ds = sim.S[i] - sim.S[i-1];
+          distanceRate.push(ds / dt);
+        }
+        const distanceRateConverted = distanceRate.map(rate => UnitConverter.convertDistance(rate, distanceUnit));
+        xData = sim.T.slice(1); 
+        yData = distanceRateConverted;
+      }
       else if (currentView === 'accel_tg') { xData = sim.T; yData = sim.A.map(a=>a/g_mps2); }
       else if (currentView === 'accel_sg') { xData = speedConverted; yData = sim.A.map(a=>a/g_mps2); }
       else { xData = sim.T; yData = speedConverted; }
@@ -130,10 +153,9 @@ function regenerateFrozenTraces() {
         const distanceUnit = UnitConverter.getDistanceUnit(userPreferences.speed);
         hoverTemplate = `Time: %{x:.2f}s<br>Speed: %{y:.1f} ${userPreferences.speed}<br>Distance: %{customdata:.0f} ${distanceUnit}<extra></extra>`;
       } else if (currentView === 'accel_td') {
-        // Time vs Distance - add speed info
-        customData = speedConverted;
+        // Time vs Distance Rate - show instantaneous distance rate
         const distanceUnit = UnitConverter.getDistanceUnit(userPreferences.speed);
-        hoverTemplate = `Time: %{x:.2f}s<br>Distance: %{y:.0f} ${distanceUnit}<br>Speed: %{customdata:.1f} ${userPreferences.speed}<extra></extra>`;
+        hoverTemplate = `Time: %{x:.2f}s<br>Distance Rate: %{y:.1f} ${UnitConverter.getDistanceLabel(distanceUnit)}/s<extra></extra>`;
       } else if (currentView === 'accel_tg') {
         hoverTemplate = `Time: %{x:.2f}s<br>Accel: %{y:.2f} g<extra></extra>`;
       } else if (currentView === 'accel_sg') {
@@ -142,8 +164,8 @@ function regenerateFrozenTraces() {
         hoverTemplate = `Time: %{x:.2f}s<br>Speed: %{y:.1f} ${userPreferences.speed}<extra></extra>`;
       }
       
-      // Don't smooth G-force graphs
-      const lineShape = (currentView === 'accel_tg' || currentView === 'accel_sg') ? 'linear' : 'spline';
+      // Use linear shapes for plots that need to show fine detail (G-force and distance plots)
+      const lineShape = (currentView === 'accel_tg' || currentView === 'accel_sg' || currentView === 'accel_td') ? 'linear' : 'spline';
       const traceData = { x:xData, y:yData, mode:'lines', showlegend:false, hoverinfo:'x+y', hovertemplate: hoverTemplate, line:{ color: lineColor, width:2, shape: lineShape }, opacity:0.7 };
       if (customData) traceData.customdata = customData;
       frozenTraces.push(traceData);
@@ -195,23 +217,36 @@ function regenerateFrozenTraces() {
       
       // Add shift point connectors
       const maxYConverted = UnitConverter.convertTorque(maxY, userPreferences.torque);
+      // Generate frozen labels using fixed percentages that work with any axis scale
       for (let g = 1; g <= 5; g++) {
         const xShift = shift_speed[g];
         if (xShift != null) {
-          const yLabel = Math.max(0, (0.97 - configIndex * 0.03)) * maxYConverted;
+          // Use fixed percentage positioning that works regardless of axis scale
+          const basePercent = 0.93, stepPercent = 0.03;  // Start at 93%, step down 3% each config
+          const yLabelPercent = Math.max(0.85, basePercent - (configIndex * stepPercent));
           const speedsNext = rpmArr.map(r => rpmToSpeed(r, gear_ratios[g + 1], fd));
           const idxNext = speedsNext.findIndex(s => s >= xShift);
           const torqueNext = idxNext !== -1 ? UnitConverter.convertTorque(wt[g + 1][idxNext], userPreferences.torque) : 0;
           const xShiftConverted = UnitConverter.convertSpeed(xShift, userPreferences.speed);
+          
+          // Store percentage instead of absolute value - will be converted during plot
           frozenConnectorTraces.push({
-            x: [xShiftConverted, xShiftConverted], y: [yLabel, torqueNext], mode: 'lines',
+            x: [xShiftConverted, xShiftConverted], 
+            y: [yLabelPercent, torqueNext], 
+            mode: 'lines',
             line: { color: gear_colors[g - 1], width: 1, dash: dashStyle },
-            showlegend: false, hoverinfo: 'skip'
+            showlegend: false, hoverinfo: 'skip',
+            _yLabelPercent: yLabelPercent // Store for label positioning
           });
           frozenConnectorTraces.push({
-            x: [xShiftConverted], y: [yLabel], mode: 'text', text: [`${xShiftConverted.toFixed(1)} ${userPreferences.speed}`],
-            textposition: 'top center', textfont: { color: gear_colors[g - 1] },
-            showlegend: false, hoverinfo: 'skip', cliponaxis: false
+            x: [xShiftConverted], 
+            y: [yLabelPercent], 
+            mode: 'text', 
+            text: [`${xShiftConverted.toFixed(1)} ${userPreferences.speed}`],
+            textposition: 'bottom center', 
+            textfont: { color: gear_colors[g - 1] },
+            showlegend: false, hoverinfo: 'skip', cliponaxis: false,
+            _isLabel: true, _yLabelPercent: yLabelPercent
           });
         }
       }
@@ -300,12 +335,13 @@ function plotTorque(animate = true) {
       }
     });
     
-    // Calculate bounds with some padding
-    const minRPM = Math.min(...allXData);
-    const maxRPM = Math.max(...allXData);
-    const maxY = Math.max(...allYData);
-    const xPadding = (maxRPM - minRPM) * 0.05; // 5% padding
-    const yPadding = maxY * 0.1; // 10% padding
+    // Calculate optimal Y-axis range using scaling rule (pass current bounds for dyno)
+    const [yMin, yMax] = calculateOptimalYRange(allYData, 0, currentAxisBounds.dyno.yMax);
+    currentAxisBounds.dyno.yMax = yMax; // Store new Y bounds
+    
+    // Calculate optimal X-axis range using scaling rule (pass current bounds for dyno)
+    const [xMinCalc, xMaxCalc] = calculateOptimalAxisRange(allXData, 0, currentAxisBounds.dyno.xMax);
+    currentAxisBounds.dyno.xMax = xMaxCalc; // Store new X bounds
     
     const dynoLayout = { 
       title: viewTitle, 
@@ -313,13 +349,13 @@ function plotTorque(animate = true) {
         title:'RPM', 
         color:'white', 
         autorange:false, 
-        range:[Math.max(0, minRPM - xPadding), maxRPM + xPadding] 
+        range:[xMinCalc, xMaxCalc] 
       }, 
       yaxis:{ 
         title:`${UnitConverter.getPowerLabel(userPreferences.power)} / ${UnitConverter.getTorqueLabel(userPreferences.torque)}`, 
         color:'white', 
         autorange:false, 
-        range:[0, maxY + yPadding] 
+        range:[yMin, yMax] 
       }, 
       plot_bgcolor:'#111', 
       paper_bgcolor:'#111', 
@@ -336,8 +372,163 @@ function plotTorque(animate = true) {
     previousTraces = []; return;
   }
 
+  if (view === 'accel_gap') {
+    // Collect all simulations (current + frozen configs)
+    const simulations = [];
+    const simulationLabels = [];
+    
+    // Use fixed maximum time for all simulations to ensure consistency
+    const gapMaxTime = FIXED_AXIS_BOUNDS.accel.maxTime;
+    
+    // Add current configuration simulation
+    const currentSim = simulateAccel(hpArr, rpmArr, fd, 0.01, getMassLb(), getShiftMs(), null, gapMaxTime);
+    simulations.push(currentSim);
+    const weightLb = getMassLb();
+    const shiftMs = getShiftMs();
+    const weightUnit = UnitConverter.getWeightUnit(userPreferences.speed);
+    const displayWeight = UnitConverter.convertWeight(weightLb, weightUnit);
+    simulationLabels.push(`${currentBikeData.name} (F${front}/R${rear} ${hpKey}) ${Math.round(displayWeight)} ${weightUnit}`);
+    
+    // Add frozen configurations simulations
+    if (frozenConfigurations.length > 0) {
+      const originalGlobals = { primary_drive, tire_circ_in, Crr, CdA, gear_ratios };
+      
+      frozenConfigurations.forEach((config, index) => {
+        const { bikeId, front: fFrozen, rear: rFrozen, hpKey: hpKeyFrozen, weightLb: weightLbFrozen, shiftMs: shiftMsFrozen, shiftRpmSetting } = config;
+        
+        const bikeData = getBikeDataSets(bikeId);
+        if (!bikeData) return;
+        
+        // Set globals for this frozen config
+        const bikeSpecs = bikeData.specifications;
+        primary_drive = bikeSpecs.primary_drive;
+        tire_circ_in = bikeSpecs.tire_circ_in;
+        Crr = bikeSpecs.Crr;
+        CdA = bikeSpecs.CdA;
+        gear_ratios = bikeSpecs.gear_ratios;
+        
+        const fdFrozen = rFrozen / fFrozen;
+        const frozenSim = simulateAccel(bikeData.hpDenseSets[hpKeyFrozen], bikeData.rpmDense, fdFrozen, 0.01, weightLbFrozen, shiftMsFrozen, shiftRpmSetting, gapMaxTime);
+        simulations.push(frozenSim);
+        
+        const bikeName = BIKES_DATA[bikeId]?.name || bikeId;
+        const frozenDisplayWeight = UnitConverter.convertWeight(weightLbFrozen, weightUnit);
+        simulationLabels.push(`${bikeName} (F${fFrozen}/R${rFrozen} ${hpKeyFrozen}) ${Math.round(frozenDisplayWeight)} ${weightUnit}`);
+      });
+      
+      // Restore original globals
+      primary_drive = originalGlobals.primary_drive;
+      tire_circ_in = originalGlobals.tire_circ_in;
+      Crr = originalGlobals.Crr;
+      CdA = originalGlobals.CdA;
+      gear_ratios = originalGlobals.gear_ratios;
+    }
+    
+    // Calculate gap data
+    const gapData = calculateGapData(simulations);
+    if (!gapData) return;
+    
+    // Convert gap distances to user's preferred units
+    const distanceUnit = UnitConverter.getDistanceUnit(userPreferences.speed);
+    
+    // Collect all Y-data (gap values) and convert to user units
+    let allYData = [];
+    if (gapData && gapData.length > 0) {
+      gapData.forEach(gap => {
+        const gapConverted = gap.gap.map(g => UnitConverter.convertDistance(g, distanceUnit));
+        allYData = allYData.concat(gapConverted);
+      });
+    }
+    
+    // Calculate optimal Y-axis range using scaling rule (pass current bounds for gap)
+    const [yMin, yMax] = calculateOptimalYRange(allYData, 0, currentAxisBounds.accel_gap.yMax);
+    currentAxisBounds.accel_gap.yMax = yMax; // Store new Y bounds
+    // Keep fixed time X-axis for gap plots
+    currentAxisBounds.accel_gap.xMax = gapMaxTime;
+    
+    const traces = [];
+    const currentColor = gear_colors[freezeCount % gear_colors.length];
+    
+    // Get baseline (slowest/first) simulation for speed comparison
+    const baselineSim = simulations[0];
+    const baselineSpeedConverted = baselineSim.V.map(mph => UnitConverter.convertSpeed(mph, userPreferences.speed));
+
+    // Create gap traces
+    gapData.forEach((gap, index) => {
+      const gapConverted = gap.gap.map(g => UnitConverter.convertDistance(g, distanceUnit));
+      const actualDistConverted = gap.actualDistance.map(d => UnitConverter.convertDistance(d, distanceUnit));
+      
+      // Get speed data from the corresponding simulation
+      const sim = simulations[index];
+      const speedConverted = sim.V.map(mph => UnitConverter.convertSpeed(mph, userPreferences.speed));
+      
+      // Calculate speed difference from baseline
+      const speedDifference = speedConverted.map((speed, i) => speed - baselineSpeedConverted[i]);
+      
+      const color = index === 0 ? currentColor : gear_colors[(freezeCount + index) % gear_colors.length];
+      const isCurrentConfig = index === 0;
+      
+      // Legend entries
+      traces.push({ 
+        x:[null], y:[null], mode:'lines', name: simulationLabels[index], showlegend:true, hoverinfo:'skip', 
+        line:{ color: color, width: isCurrentConfig ? 3 : 2, shape:'spline' } 
+      });
+      
+      // Main gap trace - use arrays for multiple hover data
+      traces.push({
+        x: gap.T,
+        y: gapConverted,
+        customdata: speedConverted.map((speed, i) => [speed, speedDifference[i], actualDistConverted[i]]),
+        mode: 'lines',
+        showlegend: false,
+        hoverinfo: 'x+y',
+        hovertemplate: `Time: %{x:.2f}s<br>Gap: %{y:.0f} ${UnitConverter.getDistanceLabel(distanceUnit)}<br>Speed: %{customdata[0]:.1f} ${userPreferences.speed}<br>Speed Diff: %{customdata[1]:+.1f} ${userPreferences.speed}<br>Actual Distance: %{customdata[2]:.0f} ${UnitConverter.getDistanceLabel(distanceUnit)}<extra></extra>`,
+        line: { color: color, width: isCurrentConfig ? 3 : 2, shape: 'spline' },
+        opacity: isCurrentConfig ? 1.0 : 0.7
+      });
+    });
+    
+    // Add reference line at y=0
+    traces.push({
+      x: [0, gapMaxTime],
+      y: [0, 0],
+      mode: 'lines',
+      line: { color: 'gray', width: 1, dash: 'dash' },
+      showlegend: false,
+      hoverinfo: 'skip'
+    });
+    
+    const viewTitle = 'Gap vs Time';
+    
+    const layout = {
+      title: viewTitle,
+      xaxis: { title: 'Time (s)', color: 'white', range: [0, gapMaxTime], autorange: false },
+      yaxis: { title: `Gap ${UnitConverter.getDistanceLabel(distanceUnit)}`, color: 'white', range: [yMin, yMax], autorange: false },
+      plot_bgcolor: '#111',
+      paper_bgcolor: '#111',
+      font: { color: 'white' },
+      hovermode: 'closest',
+      hoverdistance: 10,
+      transition: { duration: 1000, easing: 'cubic-in-out' }
+    };
+    
+    if (animate) {
+      Plotly.react('plot', traces, layout, { responsive: true });
+    } else {
+      const staticLayout = { ...layout };
+      delete staticLayout.transition;
+      Plotly.newPlot('plot', traces, staticLayout, { responsive: true });
+    }
+    
+    previousTraces = traces;
+    Plotly.Plots.resize(document.getElementById('plot'));
+    return;
+  }
+
   if (fam === 'accel') {
-    const sim = simulateAccel(hpArr, rpmArr, fd, 0.02);
+    // Use same synchronized time approach as gap plots with finer resolution for gear shift detail
+    const accelMaxTime = FIXED_AXIS_BOUNDS.accel.maxTime;
+    const sim = simulateAccel(hpArr, rpmArr, fd, 0.01, getMassLb(), getShiftMs(), getCurrentShiftRpmSetting(), accelMaxTime);
     let xData, yData, xTitle, yTitle, showShift=false;
     
     // Convert speed data to user's preferred units
@@ -359,10 +550,21 @@ function plotTorque(animate = true) {
       showShift=true; 
     }
     else if (view === 'accel_td') { 
-      xData = sim.T; 
-      yData = distanceConverted; 
+      // For distance plots, show distance rate (derivative) to reveal gear shift effects
+      // Calculate distance rate (feet/second or meters/second) to show acceleration changes
+      const distanceRate = [];
+      for (let i = 1; i < sim.S.length; i++) {
+        const dt = sim.T[i] - sim.T[i-1];
+        const ds = sim.S[i] - sim.S[i-1];
+        distanceRate.push(ds / dt); // distance rate in original units (ft/s)
+      }
+      // Convert to user's preferred units and match time array length
+      const distanceRateConverted = distanceRate.map(rate => UnitConverter.convertDistance(rate, distanceUnit));
+      
+      xData = sim.T.slice(1); // Skip first point to match derivative array length
+      yData = distanceRateConverted; 
       xTitle='Time (s)'; 
-      yTitle=UnitConverter.getDistanceLabel(distanceUnit); 
+      yTitle=`Distance Rate (${UnitConverter.getDistanceLabel(distanceUnit)}/s)`; 
     }
     else if (view === 'accel_tg') { xData = sim.T; yData = sim.A.map(a=>a/g_mps2); xTitle='Time (s)'; yTitle='Acceleration (g)'; }
     else if (view === 'accel_sg') { 
@@ -394,9 +596,8 @@ function plotTorque(animate = true) {
       mainCustomData = distanceConverted;
       mainHoverTemplate = `Time: %{x:.2f}s<br>Speed: %{y:.1f} ${userPreferences.speed}<br>Distance: %{customdata:.0f} ${distanceUnit}<extra></extra>`;
     } else if (view === 'accel_td') {
-      // Time vs Distance - add speed info  
-      mainCustomData = speedConverted;
-      mainHoverTemplate = `Time: %{x:.2f}s<br>Distance: %{y:.0f} ${distanceUnit}<br>Speed: %{customdata:.1f} ${userPreferences.speed}<extra></extra>`;
+      // Time vs Distance Rate - show instantaneous distance rate
+      mainHoverTemplate = `Time: %{x:.2f}s<br>Distance Rate: %{y:.1f} ${UnitConverter.getDistanceLabel(distanceUnit)}/s<extra></extra>`;
     } else {
       // Keep original hover template for other views
       mainHoverTemplate = (xTitle.startsWith('Time') ? `Time: %{x:.2f}s` : `Speed: %{x:.1f} ${userPreferences.speed}`) + '<br>' +
@@ -406,8 +607,8 @@ function plotTorque(animate = true) {
         '<extra></extra>';
     }
 
-    // Don't smooth G-force graphs
-    const mainLineShape = (view === 'accel_tg' || view === 'accel_sg') ? 'linear' : 'spline';
+    // Use linear shapes for plots that need to show fine detail (G-force and distance plots)
+    const mainLineShape = (view === 'accel_tg' || view === 'accel_sg' || view === 'accel_td') ? 'linear' : 'spline';
     const mainTrace = { x:xData, y:yData, mode:'lines', name:'Acceleration View', showlegend:false, hoverinfo:'x+y',
       hovertemplate: mainHoverTemplate, line:{ color: currentColor, width:2, shape: mainLineShape } };
     if (mainCustomData) mainTrace.customdata = mainCustomData;
@@ -424,29 +625,57 @@ function plotTorque(animate = true) {
 
     const viewTitle = document.getElementById('viewSelect').options[document.getElementById('viewSelect').selectedIndex].text;
     
-    // Set fixed axis ranges based on chart type
+    // Collect all Y-data from current trace
+    let allYData = [...yData];
+    
+    // Include Y-data from frozen traces
+    frozenTraces.forEach(trace => {
+      if (trace.y && Array.isArray(trace.y)) {
+        const validY = trace.y.filter(y => y !== null && y !== undefined && !isNaN(y));
+        allYData = allYData.concat(validY);
+      }
+    });
+    
+    // Calculate optimal Y-axis range using scaling rule (pass current bounds for this accel view)
+    // For G-force plots, be more aggressive about rescaling to ensure proper utilization
+    let currentMaxForCalc = currentAxisBounds[view].yMax;
+    if ((view === 'accel_tg' || view === 'accel_sg') && currentMaxForCalc && allYData.length > 0) {
+      const maxDataValue = Math.max(...allYData);
+      const utilization = maxDataValue / currentMaxForCalc;
+      // For G-force plots, rescale if utilization is less than 80% instead of 90%
+      if (utilization < 0.8) {
+        currentMaxForCalc = null; // Force recalculation
+      }
+    }
+    const [yMin, yMax] = calculateOptimalYRange(allYData, 0, currentMaxForCalc);
+    currentAxisBounds[view].yMax = yMax; // Store new Y bounds for this view
+    
+    // Set axis ranges based on chart type
     let xRange, yRange;
-    if (view === 'accel_ts') {
-      xRange = [0, FIXED_AXIS_BOUNDS.accel.maxTime];
-      yRange = [0, accelMaxSpeed];
-    } else if (view === 'accel_td') {
-      xRange = [0, FIXED_AXIS_BOUNDS.accel.maxTime];
-      yRange = [0, accelMaxDistance];
-    } else if (view === 'accel_tg') {
-      xRange = [0, FIXED_AXIS_BOUNDS.accel.maxTime];
-      yRange = [0, FIXED_AXIS_BOUNDS.accel.maxG];
-    } else if (view === 'accel_sg') {
-      xRange = [0, accelMaxSpeed];
-      yRange = [0, FIXED_AXIS_BOUNDS.accel.maxG];
+    if (view === 'accel_sg') {
+      // For speed vs G's, collect X-data and use smart X-axis scaling
+      let allXData = [...xData];
+      frozenTraces.forEach(trace => {
+        if (trace.x && Array.isArray(trace.x)) {
+          const validX = trace.x.filter(x => x !== null && x !== undefined && !isNaN(x));
+          allXData = allXData.concat(validX);
+        }
+      });
+      const [xMin, xMaxCalc] = calculateOptimalAxisRange(allXData, 0, currentAxisBounds[view].xMax);
+      currentAxisBounds[view].xMax = xMaxCalc; // Store new X bounds
+      xRange = [xMin, xMaxCalc];
+      yRange = [yMin, yMax];
     } else {
+      // For time-based plots, keep fixed time axis
       xRange = [0, FIXED_AXIS_BOUNDS.accel.maxTime];
-      yRange = [0, accelMaxSpeed];
+      currentAxisBounds[view].xMax = FIXED_AXIS_BOUNDS.accel.maxTime; // Store fixed X bounds
+      yRange = [yMin, yMax];
     }
     
     const layout = {
       title: viewTitle,
-      xaxis: { title:xTitle, color:'white', range:xRange },
-      yaxis: { title:yTitle, color:'white', range:yRange },
+      xaxis: { title:xTitle, color:'white', range:xRange, autorange:false },
+      yaxis: { title:yTitle, color:'white', range:yRange, autorange:false },
       plot_bgcolor:'#111', paper_bgcolor:'#111', font:{ color:'white' },
       hovermode:'closest', hoverdistance:10, transition:{ duration:1000, easing:'cubic-in-out' }
     };
@@ -497,27 +726,77 @@ function plotTorque(animate = true) {
   }
 
   const connectorTraces = [];
-  // Use fixed axis bounds for wheel torque chart - ensure at least 160 MPH equivalent
+  
+  // Collect all Y-data (torque values) from current traces
+  let allYData = [];
+  traces.forEach(trace => {
+    if (trace.y && Array.isArray(trace.y)) {
+      const validY = trace.y.filter(y => y !== null && y !== undefined && !isNaN(y));
+      allYData = allYData.concat(validY);
+    }
+  });
+  
+  // Include data from frozen traces
+  frozenTraces.forEach(trace => {
+    if (trace.y && Array.isArray(trace.y)) {
+      const validY = trace.y.filter(y => y !== null && y !== undefined && !isNaN(y));
+      allYData = allYData.concat(validY);
+    }
+  });
+  
+  // Calculate optimal Y-axis range using scaling rule (pass current bounds for wheel)
+  const [yMin, yMax] = calculateOptimalYRange(allYData, 0, currentAxisBounds.wheel.yMax);
+  currentAxisBounds.wheel.yMax = yMax; // Store new Y bounds
+  // Keep X-axis fixed for wheel torque based on speed capability
+  currentAxisBounds.wheel.xMax = UnitConverter.convertSpeed(Math.max(160, FIXED_AXIS_BOUNDS.wheel.maxSpeed), userPreferences.speed);
+  const maxYConverted = yMax;
+  
+  // For X-axis, keep reasonable bounds based on speed capabilities
   const wheelMaxSpeedMPH = Math.max(160, FIXED_AXIS_BOUNDS.wheel.maxSpeed);
   const maxXConverted = UnitConverter.convertSpeed(wheelMaxSpeedMPH, userPreferences.speed);
-  const maxYConverted = UnitConverter.convertTorque(FIXED_AXIS_BOUNDS.wheel.maxTorque, userPreferences.torque);
   
+  // Convert frozen trace percentages to actual Y values and generate current labels
+  frozenConnectorTraces.forEach(trace => {
+    if (trace._yLabelPercent) {
+      if (trace._isLabel) {
+        // Convert percentage to actual Y position for labels
+        trace.y = [trace._yLabelPercent * yMax];
+      } else {
+        // Convert percentage to actual Y position for connector lines  
+        trace.y = [trace._yLabelPercent * yMax, trace.y[1]]; // Keep torque value, convert label position
+      }
+    }
+  });
+
+  // Generate labels only for current configuration
   for (let g = 1; g <= 5; g++) {
     const xShift = shift_speed[g];
     if (xShift != null) {
-      const baseRatio = 0.97, stepRatio = 0.03;
-      const yLabel = Math.max(0, baseRatio - freezeCount * stepRatio) * maxYConverted;
+      // Position current labels at top using percentage of current axis max
+      const basePercent = 0.96;  // Start at 96% of current axis max
+      const yLabel = basePercent * yMax;
       const speedsNext = rpmArr.map(r => rpmToSpeed(r, gear_ratios[g + 1], fd));
       const idxNext = speedsNext.findIndex(s => s >= xShift);
       const torqueNext = idxNext !== -1 ? UnitConverter.convertTorque(wt[g + 1][idxNext], userPreferences.torque) : 0;
       const xShiftConverted = UnitConverter.convertSpeed(xShift, userPreferences.speed);
-      connectorTraces.push({ x:[xShiftConverted, xShiftConverted], y:[yLabel, torqueNext], mode:'lines', line:{ color:gear_colors[g - 1], width:2, dash: activeDash || 'solid' }, showlegend:false, hoverinfo:'skip' });
-      connectorTraces.push({ x:[xShiftConverted], y:[yLabel], mode:'text', text:[`${xShiftConverted.toFixed(1)} ${userPreferences.speed}`], textposition:'top center', textfont:{ color:gear_colors[g - 1] }, showlegend:false, hoverinfo:'skip', cliponaxis:false });
+      
+      connectorTraces.push({ x:[xShiftConverted, xShiftConverted], y:[yLabel, torqueNext], mode:'lines', line:{ color:gear_colors[g - 1], width:2, dash:'solid' }, showlegend:false, hoverinfo:'skip' });
+      connectorTraces.push({ x:[xShiftConverted], y:[yLabel], mode:'text', text:[`${xShiftConverted.toFixed(1)} ${userPreferences.speed}`], textposition:'bottom center', textfont:{ color:gear_colors[g - 1] }, showlegend:false, hoverinfo:'skip', cliponaxis:false });
     }
   }
 
   const viewTitle = document.getElementById('viewSelect').options[document.getElementById('viewSelect').selectedIndex].text;
-  const layout = { transition:{ duration:1000, easing:'cubic-in-out' }, hovermode:'closest', hoverdistance:10, title: viewTitle, xaxis:{title:UnitConverter.getSpeedLabel(userPreferences.speed), color:'white', range:[0,maxXConverted]}, yaxis:{title:`Wheel ${UnitConverter.getTorqueLabel(userPreferences.torque)}`, color:'white', range:[0,maxYConverted]}, plot_bgcolor:'#111', paper_bgcolor:'#111', font:{color:'white'} };
+  const layout = { 
+    transition:{ duration:1000, easing:'cubic-in-out' }, 
+    hovermode:'closest', 
+    hoverdistance:10, 
+    title: viewTitle, 
+    xaxis:{title:UnitConverter.getSpeedLabel(userPreferences.speed), color:'white', range:[0,maxXConverted], autorange:false}, 
+    yaxis:{title:`Wheel ${UnitConverter.getTorqueLabel(userPreferences.torque)}`, color:'white', range:[yMin,yMax], autorange:false}, 
+    plot_bgcolor:'#111', 
+    paper_bgcolor:'#111', 
+    font:{color:'white'} 
+  };
   const allTraces = [...traces, ...connectorTraces, ...frozenTraces, ...frozenConnectorTraces];
   if (animate) Plotly.react('plot', allTraces, layout, {responsive: true});
   else { const staticLayout = { ...layout }; delete staticLayout.transition; Plotly.newPlot('plot', allTraces, staticLayout, {responsive: true}); }
